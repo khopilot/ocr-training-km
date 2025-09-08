@@ -39,7 +39,9 @@ export SALAD_CONTAINER_GROUP_ID=${SALAD_CONTAINER_GROUP_ID:-local}
 export PYTHONUNBUFFERED=1
 export CUDA_VISIBLE_DEVICES=0
 export TF_CPP_MIN_LOG_LEVEL=2
-export OMP_NUM_THREADS=8
+# Set OMP_NUM_THREADS to 1 for PaddlePaddle optimization
+export OMP_NUM_THREADS=1
+export MKL_NUM_THREADS=1
 
 # Add local bin to PATH
 export PATH=$HOME/.local/bin:$PATH
@@ -80,7 +82,14 @@ if [ "$EUID" -eq 0 ]; then
         htop \
         tree \
         tmux \
-        vim
+        vim \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        libgomp1 \
+        libglib2.0-dev
 else
     # Not root, use sudo
     sudo apt-get update
@@ -104,7 +113,14 @@ else
         htop \
         tree \
         tmux \
-        vim
+        vim \
+        libgl1-mesa-glx \
+        libglib2.0-0 \
+        libsm6 \
+        libxext6 \
+        libxrender-dev \
+        libgomp1 \
+        libglib2.0-dev
 fi
 
 echo "✅ System dependencies installed"
