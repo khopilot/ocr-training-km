@@ -139,9 +139,7 @@ def run_real_training():
         cmd = [
             "python", "train/run.py",
             "--config", config_path,
-            "--output_dir", "models/hf_trained",
-            "--num_workers", "4",
-            "--log_interval", "10",
+            "--save-dir", "models/hf_trained",  # Fixed: use --save-dir not --output_dir
         ]
         
         try:

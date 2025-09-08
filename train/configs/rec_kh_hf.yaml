@@ -22,12 +22,10 @@ train:
   save_steps: 500
   
 data:
-  # Combined dataset paths
-  train_lists:
-    - data/paddle_format/recognition/train/label.txt  # SynthKhmer-10k
-    - data/paddle_format/fonts_recognition/label.txt  # khmerfonts-info-previews
-  val_list: data/paddle_format/recognition/val/label.txt
-  test_list: data/paddle_format/recognition/test/label.txt
+  # Fixed to use actual existing data files
+  train_list: data/train_list.txt  # Changed from train_lists (plural) to train_list (singular)
+  val_list: data/val_list.txt
+  test_list: data/test_list.txt
   format: paddleocr_rec
   
   # Data augmentation for recognition
