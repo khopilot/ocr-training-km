@@ -1,0 +1,89 @@
+# Khmer OCR Training Dependencies for Python 3.12
+# These versions are specifically tested to work with Python 3.12
+
+# Core dependencies - Python 3.12 compatible versions
+numpy==1.26.4
+opencv-python==4.6.0.66
+opencv-contrib-python==4.6.0.66
+Pillow==10.4.0
+
+# ONNX Runtime for GPU inference
+onnxruntime-gpu==1.18.1
+
+# Language modeling
+sentencepiece==0.1.99
+pyctcdecode==0.5.0
+
+# Transformers ecosystem
+transformers==4.36.0
+datasets==2.16.0
+huggingface_hub==0.20.0
+tokenizers==0.15.0
+safetensors==0.4.1
+
+# API Framework
+fastapi==0.112.0
+uvicorn[standard]==0.30.5
+python-multipart==0.0.9
+pydantic==2.8.2
+python-dotenv==1.0.1
+
+# Data processing - Python 3.12 compatible versions
+pandas==2.1.4  # First version with full Python 3.12 support
+scipy==1.11.4  # Supports Python 3.12
+scikit-image==0.22.0  # Supports Python 3.12
+scikit-learn==1.3.2  # Supports Python 3.12
+matplotlib==3.8.2  # Supports Python 3.12
+
+# Utilities
+tqdm==4.66.5
+pyyaml==6.0.2
+requests==2.32.3
+click==8.1.7
+fire==0.5.0
+six==1.16.0
+
+# Image processing
+imgaug==0.4.0
+lmdb==1.4.1
+shapely==2.0.2
+pyclipper==1.3.0.post5
+
+# Document processing
+lxml==5.1.0
+beautifulsoup4==4.12.3
+python-docx==1.1.0
+openpyxl==3.1.2
+premailer==3.10.0
+
+# Skip pdf2docx as it has complex dependencies
+# pdf2docx==0.5.8
+
+# Monitoring and profiling
+prometheus-client==0.20.0
+psutil==6.0.0
+py-cpuinfo==9.0.0
+gpustat==1.1.1
+
+# Visualization
+# Skip visualdl as it may have compatibility issues
+tensorboard==2.15.1
+tensorboardX==2.6.2
+
+# Testing
+pytest==7.4.3
+pytest-cov==4.1.0
+pytest-xdist==3.5.0
+
+# Additional ML dependencies
+rapidfuzz==3.5.2
+fonttools==4.46.0
+attrdict==2.0.1
+termcolor==2.4.0
+coloredlogs==15.0.1
+humanfriendly==10.0
+
+# Build dependencies
+cython==3.0.8
+wheel==0.42.0
+setuptools==69.0.3

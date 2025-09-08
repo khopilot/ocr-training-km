@@ -12,16 +12,25 @@ bash deploy/salad/salad-ubuntu-setup-fixed.sh
 bash deploy/salad/training-entrypoint-fixed.sh
 ```
 
-### Issue 2: NumPy Version Conflicts
-**Error:** Various packages requiring different numpy versions
+### Issue 2: Python 3.12 Compatibility Issues
+**Error:** `scipy==1.10.1` not found, or `module 'pkgutil' has no attribute 'ImpImporter'`
 
-**Solution:** Use the fixed requirements file with pinned compatible versions:
+**Solution:** Python 3.12 requires different package versions:
 ```bash
-pip install numpy==1.23.5  # Install this first
-pip install -r deploy/salad/requirements-salad.txt
+# The setup script auto-detects Python version and uses appropriate requirements
+bash deploy/salad/salad-ubuntu-setup-fixed.sh
+
+# Or manually for Python 3.12:
+pip install numpy==1.26.4
+pip install -r deploy/salad/requirements-py312.txt
 pip install --no-deps paddlepaddle-gpu==2.6.1
 pip install --no-deps paddleocr==2.7.0
 ```
+
+**Note:** Key version differences for Python 3.12:
+- scipy needs >=1.11.1 (not 1.10.1)
+- pandas needs >=2.1.0 (not 2.0.3)
+- scikit-image needs >=0.22.0 (not 0.21.0)
 
 ### Issue 3: KenLM Directory Already Exists
 **Error:** `fatal: destination path 'kenlm' already exists`

@@ -138,25 +138,35 @@ fi
 # Install Python dependencies in correct order
 echo -e "\n🐍 Installing Python dependencies (fixed order)..."
 
-# Detect Python version and choose appropriate numpy
+# Detect Python version and choose appropriate requirements file
 PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
 echo "Detected Python version: $PYTHON_VERSION"
 
-# Step 1: Install numpy with version appropriate for Python version
+# Step 1: Install numpy first
+echo "Installing numpy 1.26.4..."
+pip install numpy==1.26.4
+
+# Step 2: Choose requirements file based on Python version
 if [[ "$PYTHON_VERSION" == "3.12" ]]; then
-    echo "Installing numpy 1.26.4 for Python 3.12..."
-    pip install numpy==1.26.4
+    echo "Using Python 3.12 compatible requirements..."
+    REQUIREMENTS_FILE="deploy/salad/requirements-py312.txt"
 elif [[ "$PYTHON_VERSION" == "3.11" ]]; then
-    echo "Installing numpy 1.26.4 for Python 3.11..."
-    pip install numpy==1.26.4
+    echo "Using Python 3.11 compatible requirements..."
+    REQUIREMENTS_FILE="deploy/salad/requirements-salad.txt"
 else
-    echo "Installing numpy 1.24.4 for Python $PYTHON_VERSION..."
-    pip install numpy==1.24.4
+    echo "⚠️  Python $PYTHON_VERSION may not be fully supported. Using default requirements..."
+    REQUIREMENTS_FILE="deploy/salad/requirements-salad.txt"
 fi
 
-# Step 2: Install core dependencies
-echo "Installing core dependencies..."
-pip install -r deploy/salad/requirements-salad.txt
+# Step 3: Install core dependencies
+echo "Installing core dependencies from $REQUIREMENTS_FILE..."
+pip install -r $REQUIREMENTS_FILE || {
+    echo "⚠️  Some packages failed to install. Trying manual installation..."
+    # Manual fallback for critical packages
+    pip install opencv-python==4.6.0.66 opencv-contrib-python==4.6.0.66 Pillow==10.4.0
+    pip install fastapi==0.112.0 uvicorn[standard]==0.30.5 pydantic==2.8.2
+    pip install tqdm pyyaml requests
+}
 
 # Step 3: Install PaddlePaddle GPU with no-deps to avoid numpy conflict
 echo "Installing PaddlePaddle GPU..."
