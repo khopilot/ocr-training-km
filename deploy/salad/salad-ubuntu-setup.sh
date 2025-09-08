@@ -25,15 +25,16 @@ else
     echo "❌ NVIDIA drivers not found - this might be an issue"
 fi
 
-# Update system packages
+# Install system dependencies (skip Python - using existing venv)
 echo ""
-echo "📦 Updating system packages..."
+echo "📦 Installing system dependencies..."
+echo "💡 Using existing Python environment: $(python --version 2>/dev/null || echo 'Python not found, will use python3')"
+
 if [[ $EUID -eq 0 ]]; then
     # Running as root, no sudo needed
     apt-get update
     apt-get install -y \
-        python3.11 \
-        python3.11-dev \
+        python3-dev \
         python3-pip \
         git \
         wget \
@@ -47,15 +48,12 @@ if [[ $EUID -eq 0 ]]; then
         htop \
         tree
 
-    # Set Python 3.11 as default
-    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
-    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+    echo "✅ System dependencies installed"
 else
     # Running as non-root, use sudo
     sudo apt-get update
     sudo apt-get install -y \
-        python3.11 \
-        python3.11-dev \
+        python3-dev \
         python3-pip \
         git \
         wget \
@@ -69,9 +67,7 @@ else
         htop \
         tree
 
-    # Set Python 3.11 as default
-    sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
-    sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
+    echo "✅ System dependencies installed"
 fi
 
 # Repository should already be cloned and we're in it
