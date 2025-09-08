@@ -550,40 +550,74 @@ def main():
         print("Error: Split ratios must sum to 1.0")
         return 1
     
+    # Check if input directory exists and has data
+    if not args.input_dir.exists():
+        print(f"❌ Input directory does not exist: {args.input_dir}")
+        return 1
+    
+    # Check for any datasets
+    dataset_dirs = list(args.input_dir.iterdir())
+    if not dataset_dirs:
+        print(f"❌ No datasets found in {args.input_dir}")
+        print("Run: python ops/download_hf.py first")
+        return 1
+    
+    print(f"Found {len(dataset_dirs)} potential datasets in {args.input_dir}")
+    
     # Create output directory
     args.output_dir.mkdir(parents=True, exist_ok=True)
     
     all_stats = {}
+    failed_conversions = []
     
     # Convert SynthKhmer-10k
     if args.dataset in ["synthkhmer", "all"]:
-        try:
-            stats = convert_synthkhmer_10k(
-                args.input_dir / "SynthKhmer-10k",
-                args.output_dir,
-                tuple(args.split_ratio)
-            )
-            all_stats["synthkhmer_10k"] = stats
-        except Exception as e:
-            print(f"❌ Failed to convert SynthKhmer-10k: {e}")
+        synthkhmer_dir = args.input_dir / "SynthKhmer-10k"
+        if synthkhmer_dir.exists():
+            try:
+                stats = convert_synthkhmer_10k(
+                    synthkhmer_dir,
+                    args.output_dir,
+                    tuple(args.split_ratio)
+                )
+                all_stats["synthkhmer_10k"] = stats
+            except Exception as e:
+                print(f"❌ Failed to convert SynthKhmer-10k: {e}")
+                failed_conversions.append("SynthKhmer-10k")
+        else:
+            print(f"⚠️  SynthKhmer-10k not found in {args.input_dir}")
     
     # Convert khmerfonts-info-previews
     if args.dataset in ["fonts", "all"]:
-        try:
-            stats = convert_khmerfonts_previews(
-                args.input_dir / "khmerfonts-info-previews",
-                args.output_dir,
-                args.max_font_samples
-            )
-            all_stats["khmerfonts_previews"] = stats
-        except Exception as e:
-            print(f"❌ Failed to convert khmerfonts-info-previews: {e}")
+        fonts_dir = args.input_dir / "khmerfonts-info-previews"
+        if fonts_dir.exists():
+            try:
+                stats = convert_khmerfonts_previews(
+                    fonts_dir,
+                    args.output_dir,
+                    args.max_font_samples
+                )
+                all_stats["khmerfonts_previews"] = stats
+            except Exception as e:
+                print(f"❌ Failed to convert khmerfonts-info-previews: {e}")
+                failed_conversions.append("khmerfonts-info-previews")
+        else:
+            print(f"⚠️  khmerfonts-info-previews not found in {args.input_dir}")
+    
+    # Check if any conversions succeeded
+    if not all_stats:
+        print("\n❌ No datasets were converted successfully!")
+        if failed_conversions:
+            print(f"Failed conversions: {', '.join(failed_conversions)}")
+        return 1
     
     # Write report
-    if all_stats:
-        write_conversion_report(all_stats, args.output_dir)
+    write_conversion_report(all_stats, args.output_dir)
     
-    print("\n✨ Conversion complete!")
+    print(f"\n✅ Conversion complete! Converted {len(all_stats)} dataset(s)")
+    if failed_conversions:
+        print(f"⚠️  Failed: {', '.join(failed_conversions)}")
+    
     return 0
 
 

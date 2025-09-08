@@ -36,9 +36,19 @@ print_error() {
 print_status "Step 1: Downloading HuggingFace data..."
 if ! make download-hf 2>/dev/null; then
     print_warning "Make target failed, trying direct Python..."
-    $PY ops/download_hf.py --output-dir data/hf_datasets --priority high || {
-        print_warning "Download failed - may already exist"
-    }
+    
+    # Try the fixed downloader first
+    if [ -f "ops/download_hf_fixed.py" ]; then
+        $PY ops/download_hf_fixed.py --output-dir data/hf_datasets --priority high || {
+            print_error "Download failed"
+            exit 1
+        }
+    else
+        $PY ops/download_hf.py --output-dir data/hf_datasets --priority high || {
+            print_error "Download failed"
+            exit 1
+        }
+    fi
 fi
 
 # Step 2: Convert to PaddleOCR format
@@ -48,8 +58,8 @@ if [ ! -d "data/paddle_format" ] || [ -z "$(ls -A data/paddle_format 2>/dev/null
         --input-dir data/hf_datasets \
         --output-dir data/paddle_format \
         --dataset all || {
-        print_error "Conversion failed"
-        echo "Trying with existing data..."
+        print_error "Conversion failed - no data to convert"
+        exit 1
     }
 else
     print_status "PaddleOCR format data already exists"

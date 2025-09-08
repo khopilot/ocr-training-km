@@ -90,10 +90,10 @@ download: ## Download and prepare datasets
 
 download-hf: ## Download HuggingFace datasets from seanghay
 	@echo "$(YELLOW)Downloading HuggingFace datasets from seanghay...$(NC)"
-	@$(PYTHON_BIN) ops/download_hf.py --output-dir data/hf_datasets --priority high
+	@$(PYTHON_BIN) ops/download_hf.py --output-dir data/hf_datasets --priority high || exit 1
 	@echo "$(GREEN)✓ HF datasets downloaded!$(NC)"
 	@echo "$(YELLOW)Converting to PaddleOCR format...$(NC)"
-	@$(PYTHON_BIN) ops/convert_to_paddle.py --input-dir data/hf_datasets --output-dir data/paddle_format
+	@$(PYTHON_BIN) ops/convert_to_paddle.py --input-dir data/hf_datasets --output-dir data/paddle_format || exit 1
 	@echo "$(GREEN)✓ Conversion complete!$(NC)"
 	@echo "$(YELLOW)Building unified lexicon...$(NC)"
 	@$(PYTHON_BIN) ops/build_lexicon.py --input-dir data/hf_datasets --output-dir lang/lexicon
@@ -176,9 +176,14 @@ serve-prod: ## Start production OCR service
 	@echo "$(YELLOW)Starting production OCR service...$(NC)"
 	@$(PYTHON_BIN) -m uvicorn service.app:app --host 0.0.0.0 --port 8080 --workers 4
 
+train-rec: ## Train recognition model (bare-metal, no Docker)
+	@echo "$(YELLOW)Training recognition model...$(NC)"
+	@$(PYTHON_BIN) train/run.py --config train/configs/rec_kh_hf.yaml
+	@echo "$(GREEN)✓ Recognition training complete!$(NC)"
+
 eval: ## Run evaluation harness (auto-detect backend)
 	@echo "$(YELLOW)Running evaluation...$(NC)"
-	@$(PYTHON_BIN) eval/harness.py --test data/test --report eval/report.json
+	@$(PYTHON_BIN) -m eval.harness --test data/test --report eval/report.json
 	@echo "$(GREEN)✓ Evaluation complete! Report: eval/report.json$(NC)"
 
 eval-demo: ## Run demo evaluation (macOS with clear labels)
