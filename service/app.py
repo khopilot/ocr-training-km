@@ -14,7 +14,11 @@ from PIL import Image
 from prometheus_client import Counter, Histogram, generate_latest
 from starlette.responses import PlainTextResponse
 
-from .schemas import OCRRequest, OCRResponse, HealthResponse, ErrorResponse, Line
+# Fix import for direct execution
+try:
+    from .schemas import OCRRequest, OCRResponse, HealthResponse, ErrorResponse, Line
+except ImportError:
+    from schemas import OCRRequest, OCRResponse, HealthResponse, ErrorResponse, Line
 
 # Service configuration
 SERVICE_VARIANT = os.environ.get("SERVICE_VARIANT", "auto")  # auto, paddle, onnx, tesseract
