@@ -28,39 +28,56 @@ fi
 # Update system packages
 echo ""
 echo "📦 Updating system packages..."
-sudo apt-get update
-sudo apt-get install -y \
-    python3.11 \
-    python3.11-dev \
-    python3-pip \
-    git \
-    wget \
-    curl \
-    build-essential \
-    cmake \
-    libgomp1 \
-    libopenblas-dev \
-    libboost-all-dev \
-    libeigen3-dev \
-    htop \
-    tree
+if [[ $EUID -eq 0 ]]; then
+    # Running as root, no sudo needed
+    apt-get update
+    apt-get install -y \
+        python3.11 \
+        python3.11-dev \
+        python3-pip \
+        git \
+        wget \
+        curl \
+        build-essential \
+        cmake \
+        libgomp1 \
+        libopenblas-dev \
+        libboost-all-dev \
+        libeigen3-dev \
+        htop \
+        tree
 
-# Set Python 3.11 as default
-sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
-sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
-
-# Clone repository if not exists
-echo ""
-echo "📥 Setting up Khmer OCR repository..."
-if [[ ! -d "khmer-ocr-v1" ]]; then
-    git clone https://github.com/khopilot/khmer-ocr-v1.git
-    echo "✅ Repository cloned"
+    # Set Python 3.11 as default
+    update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 else
-    echo "✅ Repository already exists"
-    cd khmer-ocr-v1 && git pull && cd ..
+    # Running as non-root, use sudo
+    sudo apt-get update
+    sudo apt-get install -y \
+        python3.11 \
+        python3.11-dev \
+        python3-pip \
+        git \
+        wget \
+        curl \
+        build-essential \
+        cmake \
+        libgomp1 \
+        libopenblas-dev \
+        libboost-all-dev \
+        libeigen3-dev \
+        htop \
+        tree
+
+    # Set Python 3.11 as default
+    sudo update-alternatives --install /usr/bin/python python /usr/bin/python3.11 1
+    sudo update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.11 1
 fi
 
-cd khmer-ocr-v1
+# Repository should already be cloned and we're in it
+echo ""
+echo "📥 Khmer OCR repository setup..."
+echo "✅ Repository already available in current directory"
 
 # Install Python dependencies
 echo ""
@@ -88,9 +105,14 @@ if [[ ! -f "/usr/local/bin/lmplz" ]]; then
     mkdir build && cd build
     cmake ..
     make -j$(nproc)
-    sudo make install
-    sudo ldconfig
-    cd ~/khmer-ocr-v1
+    if [[ $EUID -eq 0 ]]; then
+        make install
+        ldconfig
+    else
+        sudo make install
+        sudo ldconfig
+    fi
+    cd /ocr-training-km
     echo "✅ KenLM installed"
 else
     echo "✅ KenLM already installed"
