@@ -1,9 +1,9 @@
 # Khmer OCR Training Dependencies for SaladCloud
-# Compatible with Python 3.12 and CUDA 12.x
+# Compatible with Python 3.11 and 3.12 and CUDA 12.x
 # Resolves numpy version conflicts between packages
 
 # Core dependencies with strict versioning for compatibility
-numpy==1.23.5  # Last version compatible with all packages
+numpy==1.26.4  # Works with Python 3.12 and onnxruntime-gpu 1.18.1
 opencv-python==4.6.0.66
 opencv-contrib-python==4.6.0.66
 Pillow==10.4.0

@@ -138,9 +138,21 @@ fi
 # Install Python dependencies in correct order
 echo -e "\n🐍 Installing Python dependencies (fixed order)..."
 
-# Step 1: Install numpy first with specific version
-echo "Installing numpy 1.23.5..."
-pip install numpy==1.23.5
+# Detect Python version and choose appropriate numpy
+PYTHON_VERSION=$(python -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+echo "Detected Python version: $PYTHON_VERSION"
+
+# Step 1: Install numpy with version appropriate for Python version
+if [[ "$PYTHON_VERSION" == "3.12" ]]; then
+    echo "Installing numpy 1.26.4 for Python 3.12..."
+    pip install numpy==1.26.4
+elif [[ "$PYTHON_VERSION" == "3.11" ]]; then
+    echo "Installing numpy 1.26.4 for Python 3.11..."
+    pip install numpy==1.26.4
+else
+    echo "Installing numpy 1.24.4 for Python $PYTHON_VERSION..."
+    pip install numpy==1.24.4
+fi
 
 # Step 2: Install core dependencies
 echo "Installing core dependencies..."
