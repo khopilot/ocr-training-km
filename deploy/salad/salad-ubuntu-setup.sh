@@ -45,6 +45,8 @@ if [[ $EUID -eq 0 ]]; then
         libopenblas-dev \
         libboost-all-dev \
         libeigen3-dev \
+        swig \
+        pkg-config \
         htop \
         tree
 
@@ -64,6 +66,8 @@ else
         libopenblas-dev \
         libboost-all-dev \
         libeigen3-dev \
+        swig \
+        pkg-config \
         htop \
         tree
 
