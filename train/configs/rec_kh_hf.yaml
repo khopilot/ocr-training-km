@@ -2,7 +2,7 @@
 model_type: recognition
 architecture: crnn_resnet34
 input_size: [3, 48, 320]
-charset: lang/lexicon/charset_khmer.txt
+charset: train/charset_kh.txt  # Fixed path to existing file
 beam_width: 10
 
 optimizer:
