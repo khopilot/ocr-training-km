@@ -1,0 +1,72 @@
+# Professional Recognition (CTC) config for HuggingFace datasets
+# Optimized for RTX 3090 (24GB) training in Docker
+model_type: recognition
+architecture: crnn_resnet34
+input_size: [3, 48, 320]
+charset: train/charset_kh.txt
+beam_width: 10
+
+optimizer:
+  name: AdamW
+  lr: 0.001  # Increased for faster convergence
+  weight_decay: 0.01
+  scheduler:
+    name: CosineAnnealingLR
+    T_max: 50  # Match epochs
+
+train:
+  epochs: 50  # Production training
+  batch_size: 32  # Optimized for RTX 3090 24GB
+  amp: true  # Mixed precision for faster training
+  seed: 42
+  eval_steps: 100
+  save_steps: 500
+  gradient_accumulation: 2  # Effective batch size = 64
+  
+data:
+  train_list: data/paddle_format/train_list.txt
+  val_list: data/paddle_format/val_list.txt
+  test_list: data/paddle_format/test_list.txt
+  format: paddleocr_rec
+  num_workers: 4  # Parallel data loading
+  
+  # Enhanced augmentation for Khmer
+  augmentation:
+    - type: RandomCrop
+      prob: 0.3
+    - type: RandomRotate
+      degree: 5
+    - type: ColorJitter
+      brightness: 0.2
+      contrast: 0.2
+      saturation: 0.1
+    - type: GaussianNoise
+      prob: 0.15
+    - type: RandomErasing
+      prob: 0.1
+      
+# Language model integration
+language_model:
+  type: kenlm
+  model_path: lang/kenlm/khmer_5gram.bin
+  lexicon_path: lang/lexicon/khmer_lexicon.txt
+  lambda: 0.4  # LM weight (will be optimized)
+  mu: 0.15     # Lexicon penalty weight
+  
+# Evaluation metrics
+metrics:
+  - CER
+  - WER
+  - accuracy
+  
+# Production gates
+gates:
+  max_cer_clean: 0.03  # 3% for clean print
+  max_cer_degraded: 0.10  # 10% for degraded
+  max_latency_gpu_ms: 200  # 200ms per page
+  
+# Export settings
+export:
+  onnx: true
+  tensorrt: false  # Enable if needed
+  quantize: false  # Enable for edge deployment
