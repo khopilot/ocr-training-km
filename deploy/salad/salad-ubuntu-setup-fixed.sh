@@ -56,28 +56,56 @@ source ~/.bashrc_salad
 
 # Install system dependencies
 echo -e "\n📦 Installing system dependencies..."
-sudo apt-get update
-sudo apt-get install -y \
-    python3-dev \
-    python3-pip \
-    python3-venv \
-    git \
-    wget \
-    curl \
-    build-essential \
-    cmake \
-    libgomp1 \
-    libopenblas-dev \
-    libboost-all-dev \
-    libeigen3-dev \
-    swig \
-    pkg-config \
-    libssl-dev \
-    libffi-dev \
-    htop \
-    tree \
-    tmux \
-    vim
+# Check if running as root
+if [ "$EUID" -eq 0 ]; then
+    # Running as root, no sudo needed
+    apt-get update
+    apt-get install -y \
+        python3-dev \
+        python3-pip \
+        python3-venv \
+        git \
+        wget \
+        curl \
+        build-essential \
+        cmake \
+        libgomp1 \
+        libopenblas-dev \
+        libboost-all-dev \
+        libeigen3-dev \
+        swig \
+        pkg-config \
+        libssl-dev \
+        libffi-dev \
+        htop \
+        tree \
+        tmux \
+        vim
+else
+    # Not root, use sudo
+    sudo apt-get update
+    sudo apt-get install -y \
+        python3-dev \
+        python3-pip \
+        python3-venv \
+        git \
+        wget \
+        curl \
+        build-essential \
+        cmake \
+        libgomp1 \
+        libopenblas-dev \
+        libboost-all-dev \
+        libeigen3-dev \
+        swig \
+        pkg-config \
+        libssl-dev \
+        libffi-dev \
+        htop \
+        tree \
+        tmux \
+        vim
+fi
 
 echo "✅ System dependencies installed"
 
