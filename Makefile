@@ -2,10 +2,20 @@
 # Platform detection and configuration
 
 SHELL := /bin/bash
-PYTHON := python3.11
+
+# Dynamic Python detection - no hardcoded .venv
+PYTHON_BIN ?= $(shell command -v python3 || command -v python)
+PIP ?= $(shell command -v pip3 || command -v pip)
+
+# Optional venv support (if .venv exists, use it)
+ifneq ($(wildcard .venv/bin/python),)
+    PYTHON_BIN := .venv/bin/python
+    PIP := .venv/bin/pip
+endif
+
+# Legacy variables for compatibility
+PYTHON := $(PYTHON_BIN)
 VENV := .venv
-PIP := $(VENV)/bin/pip
-PYTHON_BIN := $(VENV)/bin/python
 
 # Detect OS
 UNAME_S := $(shell uname -s)
@@ -34,13 +44,17 @@ help: ## Show this help message
 
 setup: ## Set up development environment (full - Linux production)
 	@echo "$(YELLOW)Setting up Khmer OCR environment ($(PLATFORM))...$(NC)"
-	@if ! command -v $(PYTHON) &> /dev/null; then \
-		echo "$(RED)Error: Python 3.11 not found. Please install it first.$(NC)"; \
-		exit 1; \
+	@echo "Using Python: $(PYTHON_BIN)"
+	@if [ ! -d "$(VENV)" ] && [ "$(PYTHON_BIN)" != ".venv/bin/python" ]; then \
+		echo "$(YELLOW)Creating virtual environment...$(NC)"; \
+		$(PYTHON_BIN) -m venv $(VENV); \
+		$(VENV)/bin/pip install --upgrade pip setuptools wheel; \
+		$(VENV)/bin/pip install -e ".[$(EXTRAS)]"; \
+	else \
+		echo "$(YELLOW)Using existing Python environment...$(NC)"; \
+		$(PIP) install --upgrade pip setuptools wheel; \
+		$(PIP) install -e ".[$(EXTRAS)]"; \
 	fi
-	@$(PYTHON) -m venv $(VENV)
-	@$(PIP) install --upgrade pip setuptools wheel
-	@$(PIP) install -e ".[$(EXTRAS)]"
 	@if [ "$(PLATFORM)" = "linux" ]; then \
 		echo "$(YELLOW)Installing KenLM for Linux...$(NC)"; \
 		$(PIP) install https://github.com/kpu/kenlm/archive/master.zip; \

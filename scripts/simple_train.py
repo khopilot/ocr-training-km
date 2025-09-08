@@ -195,26 +195,27 @@ def main():
     print("This will train a lightweight CRNN model for Khmer text recognition")
     print("-" * 60)
     
-    # Use PaddleOCR's training command
+    # Don't import PaddleOCR training API - use our own training entry
     import subprocess
     
+    # Use our own training script instead of PaddleOCR's
     cmd = [
-        "python", "-m", "paddleocr.tools.train",
-        "-c", config_path,
-        "-o", f"Global.epoch_num=10",
-        "-o", f"Train.loader.batch_size_per_card=4",
+        "python", "train/run.py",
+        "--config", "train/configs/rec_kh_hf.yaml"
     ]
+    
+    print(f"Running command: {' '.join(cmd)}")
     
     try:
         result = subprocess.run(cmd, check=True)
         print("\n✅ Training completed!")
-        print(f"Model saved to: ./models/khmer_ocr")
+        print(f"Model saved to: ./models/")
     except subprocess.CalledProcessError as e:
         print(f"\n❌ Training failed: {e}")
-        print("\nTrying alternative: Demo training mode...")
+        print("\nTrying with CPU config...")
         
-        # Fallback to demo training
-        cmd = ["python", "train/train_demo.py", "--config", "train/configs/rec_kh.yaml", "--epochs", "10"]
+        # Fallback to CPU training with smaller batch
+        cmd = ["python", "train/run.py", "--config", "train/configs/rec_kh.yaml"]
         subprocess.run(cmd, check=False)
     
     print("\n🎉 Training pipeline complete!")
