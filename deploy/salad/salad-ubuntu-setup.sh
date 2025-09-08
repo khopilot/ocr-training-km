@@ -83,6 +83,11 @@ echo "✅ Repository already available in current directory"
 echo ""
 echo "🐍 Installing Python dependencies..."
 python -m pip install --upgrade pip setuptools wheel
+
+# Skip PyMuPDF due to Python 3.12 compatibility issues
+echo "⚠️  Skipping PyMuPDF (PDF processing) due to Python 3.12 compatibility"
+
+# Install core ML/OCR dependencies
 pip install paddlepaddle-gpu==2.6.1
 pip install paddleocr==2.7.0
 pip install onnxruntime-gpu==1.18.1
@@ -92,8 +97,12 @@ pip install huggingface_hub>=0.20.0
 pip install sentencepiece==0.1.99
 pip install pyyaml requests tqdm
 
-# Install project
-pip install -e .
+# Install additional dependencies (skip problematic ones)
+pip install numpy opencv-python Pillow fastapi uvicorn
+
+# Install project (skip problematic dependencies)
+echo "📦 Installing project in development mode..."
+pip install -e . --no-deps || echo "⚠️  Project install failed, continuing..."
 
 # Build KenLM
 echo ""
@@ -152,15 +161,15 @@ mkdir -p {models,data,logs,lang/{kenlm,tokenizer}}
 echo ""
 echo "🔧 Setting up environment..."
 cat > ~/.bashrc_salad << 'EOF'
-# Khmer OCR Training Environment
-export CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7
+# Khmer OCR Training Environment - Single RTX 3090 Setup
+export CUDA_VISIBLE_DEVICES=0
 export NVIDIA_VISIBLE_DEVICES=all
 export SERVICE_VARIANT=paddle
 export PRODUCTION_MODE=prod
 export USE_GPU=true
-export NUM_GPUS=8
-export BATCH_SIZE_PER_GPU=16
-export TOTAL_BATCH_SIZE=128
+export NUM_GPUS=1
+export BATCH_SIZE_PER_GPU=8
+export TOTAL_BATCH_SIZE=8
 export PYTHONUNBUFFERED=1
 export PYTHONDONTWRITEBYTECODE=1
 export WEBHOOK_SECRET_KEY="mJdnzFePyJ68JrW5XY73IVASOdZ9OZguxiCJc/I3NOzL5XgiwbHgyGzhO47dkWgg7J405IdxyNiUB7NNWvx3vA=="
