@@ -52,46 +52,43 @@ def train_with_huggingface():
     # Step 3: Start training
     print("\n🚀 Step 3: Starting training...")
     
-    # Import training module
-    from train.train_demo import main as train_main
-    
-    # Set training arguments
-    train_args = {
-        'config': config_path,
-        'batch_size': args.batch_size,
-        'epochs': args.epochs,
-        'learning_rate': args.lr,
-        'train_list': 'data/train_list.txt',
-        'val_list': 'data/val_list.txt',
-        'save_dir': f'models/khmer_{args.mode}_hf',
-        'log_dir': f'logs/{args.mode}_hf',
-        'use_gpu': True,
-        'checkpoint_interval': 10,
-        'eval_interval': 5,
-        'use_wandb': False,  # Set to True if you want to use Weights & Biases
-        'project_name': 'khmer-ocr-hf',
-    }
-    
     # Create directories
-    os.makedirs(train_args['save_dir'], exist_ok=True)
-    os.makedirs(train_args['log_dir'], exist_ok=True)
+    save_dir = f'models/khmer_{args.mode}_hf'
+    log_dir = f'logs/{args.mode}_hf'
+    os.makedirs(save_dir, exist_ok=True)
+    os.makedirs(log_dir, exist_ok=True)
     
     print("\nTraining Configuration:")
-    for key, value in train_args.items():
-        print(f"  {key}: {value}")
+    print(f"  config: {config_path}")
+    print(f"  batch_size: {args.batch_size}")
+    print(f"  epochs: {args.epochs}")
+    print(f"  learning_rate: {args.lr}")
+    print(f"  save_dir: {save_dir}")
+    print(f"  log_dir: {log_dir}")
     
     print("\n" + "=" * 60)
     print("Starting training loop...")
     print("=" * 60 + "\n")
     
+    # Run training - train_demo.py uses argparse, so we need to set sys.argv
+    import subprocess
+    
+    # Build command
+    cmd = [
+        "python", "train/train_demo.py",
+        "--config", config_path,
+        "--epochs", str(args.epochs),
+        "--output-dir", save_dir,
+    ]
+    
     # Run training
     try:
-        # Call the training function
-        train_main(**train_args)
+        # Run the training script
+        result = subprocess.run(cmd, check=True, capture_output=False, text=True)
         
         print("\n✅ Training completed successfully!")
-        print(f"Model saved to: {train_args['save_dir']}")
-        print(f"Logs saved to: {train_args['log_dir']}")
+        print(f"Model saved to: {save_dir}")
+        print(f"Logs saved to: {log_dir}")
         
     except Exception as e:
         print(f"\n❌ Training failed: {e}")
@@ -106,7 +103,7 @@ def train_with_huggingface():
         from eval.evaluate import evaluate_model
         
         metrics = evaluate_model(
-            model_dir=train_args['save_dir'],
+            model_dir=save_dir,
             test_list='data/val_list.txt',
             mode=args.mode
         )
