@@ -19,6 +19,13 @@ except ImportError:
     PADDLE_AVAILABLE = False
     print("Warning: PaddlePaddle not available, using placeholder training")
 
+try:
+    from transformers import AutoTokenizer
+    HAS_TOKENIZER = True
+except ImportError:
+    HAS_TOKENIZER = False
+    print("Warning: transformers not available, tokenizer disabled")
+
 
 class OCRTrainer:
     """Trainer for DBNet and Recognition models using PaddleOCR"""
@@ -35,6 +42,16 @@ class OCRTrainer:
         self.model_type = model_type
         self.config = self.load_config()
         self.use_gpu = self._check_gpu()
+        self.tokenizer = None
+        
+        # Load tokenizer for recognition models
+        if model_type == "rec" and HAS_TOKENIZER:
+            try:
+                print("🔤 Loading khopilot/km-tokenizer-khmer...")
+                self.tokenizer = AutoTokenizer.from_pretrained("khopilot/km-tokenizer-khmer")
+                print(f"   ✅ Tokenizer loaded: vocab_size={self.tokenizer.vocab_size}")
+            except Exception as e:
+                print(f"   ⚠️  Could not load tokenizer: {e}")
         
         # Platform-specific setup
         system = platform.system()
