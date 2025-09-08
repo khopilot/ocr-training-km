@@ -73,11 +73,10 @@ def train_with_huggingface():
     # Run training - train_demo.py uses argparse, so we need to set sys.argv
     import subprocess
     
-    # Build command
+    # Build command (train_demo.py only accepts --config and --output-dir)
     cmd = [
         "python", "train/train_demo.py",
         "--config", config_path,
-        "--epochs", str(args.epochs),
         "--output-dir", save_dir,
     ]
     

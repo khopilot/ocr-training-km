@@ -14,8 +14,8 @@ optimizer:
     T_max: 30
 
 train:
-  epochs: 30
-  batch_size: 64
+  epochs: 10  # Reduced for quick testing, increase to 30+ for production
+  batch_size: 4  # Reduced for GPU memory, increase if your GPU allows
   amp: true
   seed: 42
   eval_steps: 200
