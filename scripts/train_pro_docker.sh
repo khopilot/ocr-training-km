@@ -53,12 +53,27 @@ fi
 print_status "Step 3: Building text corpus..."
 make build-corpus || print_warning "Corpus building failed - continuing"
 
-# Step 4: Build Docker image
+# Step 4: Check for Docker and build image if available
+if ! command -v docker &> /dev/null; then
+    print_warning "Docker not found - falling back to bare metal training"
+    echo "Running bare metal training script instead..."
+    exec bash scripts/train_bare_metal.sh
+fi
+
 print_status "Step 4: Building Docker GPU image..."
 docker build -f docker/Dockerfile.gpu -t khmer-ocr-gpu:latest . || {
-    print_error "Docker build failed"
+    print_warning "Docker build failed - checking if Docker daemon is running"
+    if ! docker info &> /dev/null; then
+        print_error "Docker daemon not accessible"
+        echo "Falling back to bare metal training..."
+        exec bash scripts/train_bare_metal.sh
+    fi
     echo "Trying alternative build..."
-    docker build -f docker/Dockerfile.gpu --no-cache -t khmer-ocr-gpu:latest .
+    docker build -f docker/Dockerfile.gpu --no-cache -t khmer-ocr-gpu:latest . || {
+        print_error "Docker build failed completely"
+        echo "Falling back to bare metal training..."
+        exec bash scripts/train_bare_metal.sh
+    }
 }
 
 # Step 5: Train language model in Docker

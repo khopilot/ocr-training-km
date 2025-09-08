@@ -261,13 +261,34 @@ class EvaluationHarness:
             "latency_p95_pass": overall_latency_p95 <= 200,
         }
         
-        # Determine overall pass/fail
-        all_pass = (
+        # Determine overall pass/fail - wrap numpy.bool_ with bool()
+        all_pass = bool(
             report["acceptance_criteria"]["cer_clean_pass"] and
             report["acceptance_criteria"]["cer_degraded_pass"] and
             report["acceptance_criteria"]["latency_p95_pass"]
         )
         report["acceptance_criteria"]["all_pass"] = all_pass
+        
+        # Convert any numpy types to Python native types for JSON serialization
+        def convert_numpy_types(obj):
+            """Convert numpy types to native Python types"""
+            if isinstance(obj, dict):
+                return {k: convert_numpy_types(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [convert_numpy_types(item) for item in obj]
+            elif isinstance(obj, (np.bool_, np.bool8)):
+                return bool(obj)
+            elif isinstance(obj, (np.integer, np.int64, np.int32)):
+                return int(obj)
+            elif isinstance(obj, (np.floating, np.float64, np.float32)):
+                return float(obj)
+            elif isinstance(obj, np.ndarray):
+                return obj.tolist()
+            else:
+                return obj
+        
+        # Convert report before saving
+        report = convert_numpy_types(report)
         
         # Save report
         with open(output_path, "w", encoding="utf-8") as f:
