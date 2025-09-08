@@ -1,0 +1,16 @@
+./mac_m_3_setup_makefile_requirements_mac.md
+./.grok/settings.json
+./.pre-commit-config.yaml
+./Makefile
+./claude-ocr.md
+./pyproject.toml
+./.claude/settings.local.json
+./.claude/hooks/pre-edit.py
+./.claude/hooks/post-train.sh
+./.claude/scripts/monitor-pipeline.py
+./.claude/templates/agent-eval-qa.yaml
+./.claude/templates/agent-data-curator.yaml
+./.claude/templates/agent-ml-pipeline.yaml
+./README.md
+./.gitignore
+./CLAUDE.md

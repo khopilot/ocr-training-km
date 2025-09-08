@@ -1,0 +1,145 @@
+# Default values for khmer-ocr
+replicaCount: 1
+
+image:
+  repository: ghcr.io/khopilot/khmer-ocr-gpu
+  pullPolicy: IfNotPresent
+  tag: "0.1.0"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+securityContext:
+  capabilities:
+    drop:
+    - ALL
+  readOnlyRootFilesystem: false
+  allowPrivilegeEscalation: false
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations: {}
+
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+  hosts:
+    - host: ocr.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    memory: 4Gi
+    nvidia.com/gpu: 1
+  requests:
+    cpu: 2
+    memory: 2Gi
+    nvidia.com/gpu: 1
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+nodeSelector:
+  accelerator: nvidia-tesla-t4
+
+tolerations:
+  - key: nvidia.com/gpu
+    operator: Exists
+    effect: NoSchedule
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - khmer-ocr
+          topologyKey: kubernetes.io/hostname
+
+env:
+  SERVICE_VARIANT: "onnx"  # paddle or onnx
+  USE_GPU: "true"
+  WORKERS: "4"
+  LOG_LEVEL: "info"
+  MAX_REQUEST_SIZE: "50M"
+  REQUEST_TIMEOUT: "30"
+  TOKENIZER_PATH: "/app/lang/tokenizer/khopilot"
+  MODEL_DIR: "/app/models"
+
+persistence:
+  enabled: true
+  storageClass: "standard"
+  accessMode: ReadOnlyMany
+  size: 10Gi
+  existingClaim: ""
+  
+models:
+  # Mount pre-trained models from PVC or ConfigMap
+  source: "pvc"  # pvc or configmap
+  pvcName: "khmer-ocr-models"
+  configMapName: ""
+
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    scrapeTimeout: 10s
+    labels:
+      release: prometheus
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+lifecycle:
+  preStop:
+    exec:
+      command: ["/bin/sh", "-c", "sleep 15"]

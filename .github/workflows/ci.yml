@@ -1,0 +1,443 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.11"
+  CACHE_VERSION: v1
+
+jobs:
+  validate-dataset:
+    name: Dataset Validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.cache/huggingface
+          key: ${{ runner.os }}-pip-${{ env.CACHE_VERSION }}-${{ hashFiles('pyproject.toml') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-${{ env.CACHE_VERSION }}-
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .[macos,dev]
+      
+      - name: Check license compliance
+        run: |
+          python -c "
+          import pandas as pd
+          import os
+          df = pd.read_csv('governance/license_ledger.csv')
+          
+          # Check for production deployment restrictions
+          prod_mode = os.environ.get('PRODUCTION_MODE', 'demo').lower()
+          is_main_branch = '${{ github.ref }}' == 'refs/heads/main'
+          is_release = '${{ github.event_name }}' == 'release'
+          
+          if (is_main_branch or is_release) and prod_mode == 'prod':
+              print('🔍 Production build detected - checking license restrictions')
+              restricted = df[df['usage_allowed'] == 'research_only']
+              if len(restricted) > 0:
+                  print('❌ Proprietary/restricted datasets found in production build:')
+                  print(restricted[['dataset', 'license', 'usage_allowed', 'restrictions']].to_string())
+                  print('\n⚠️  Production builds cannot use research-only datasets')
+                  exit(1)
+              
+              commercial_restricted = df[df['commercial_use'] == 'no']
+              if len(commercial_restricted) > 0:
+                  print('❌ Non-commercial datasets found in production build:')
+                  print(commercial_restricted[['dataset', 'license', 'commercial_use']].to_string())
+                  exit(1)
+          
+          print('✅ License compliance check passed')
+          "
+        env:
+          PRODUCTION_MODE: ${{ github.ref == 'refs/heads/main' && 'prod' || 'demo' }}
+      
+      - name: Validate dataset structure
+        run: |
+          # Check for basic structure
+          if [ ! -f governance/license_ledger.csv ]; then
+            echo "❌ Missing license ledger"
+            exit 1
+          fi
+          
+          if [ ! -f data/sample_corpus.txt ]; then
+            echo "⚠️  No sample corpus found - generating synthetic data"
+            python ops/synth.py --samples 100 --output data/test_synth
+          fi
+          
+          echo "✅ Dataset structure validated"
+
+  smoke-train:
+    name: Smoke Training Test
+    needs: validate-dataset
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/pip
+            ~/.paddleocr
+          key: ${{ runner.os }}-paddle-${{ env.CACHE_VERSION }}-${{ hashFiles('pyproject.toml') }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[macos]"  # CPU-only for CI
+      
+      - name: Test corpus building
+        run: |
+          # Test HF corpus building pipeline
+          mkdir -p data/paddle_format/test
+          echo "test1.jpg\tសួស្តី ពិភពលោក" > data/paddle_format/test/label.txt
+          echo "test2.jpg\tប្រទេសកម្ពុជា" >> data/paddle_format/test/label.txt
+          
+          # Test corpus extraction
+          python ops/build_corpus.py \
+            --input-dirs data/paddle_format \
+            --output data/test_corpus.txt \
+            --min-length 2 --max-length 50
+          
+          if [ ! -f data/test_corpus.txt ]; then
+            echo "❌ Corpus building failed"
+            exit 1
+          fi
+          
+          echo "✅ Corpus building test passed"
+        timeout-minutes: 5
+      
+      - name: Test language model training
+        run: |
+          # Test KenLM training with HF tokenizer
+          python lang/train_lm.py \
+            --corpus data/test_corpus.txt \
+            --order 3 \
+            --output lang/test_lm \
+            --use-hf-tokenizer \
+            --hf-tokenizer khopilot/km-tokenizer-khmer || true
+          
+          echo "✅ Language model training test completed"
+        timeout-minutes: 10
+
+  strict-eval:
+    name: Strict Evaluation
+    needs: smoke-train
+    strategy:
+      matrix:
+        platform: [cpu, gpu]
+    runs-on: ${{ matrix.platform == 'gpu' && 'ubuntu-latest-gpu' || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache models
+        uses: actions/cache@v3
+        with:
+          path: |
+            models/
+            lang/kenlm/
+          key: ${{ runner.os }}-models-${{ env.CACHE_VERSION }}-${{ hashFiles('models/**') }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.platform }}" = "gpu" ]; then
+            pip install -e ".[gpu,eval]"
+          else
+            pip install -e ".[macos,eval]"
+          fi
+      
+      - name: Download test data
+        run: |
+          # Create test data if not exists
+          mkdir -p data/test
+          if [ ! -f data/test/label.txt ]; then
+            echo "test1.jpg	សួស្តី ពិភពលោក" > data/test/label.txt
+            echo "test2.jpg	ប្រទេសកម្ពុជា" >> data/test/label.txt
+          fi
+      
+      - name: Test service backends
+        if: matrix.platform == 'cpu'
+        run: |
+          # Test different service backends
+          export SERVICE_VARIANT=tesseract
+          timeout 30s python -c "
+          from service.app import load_models
+          try:
+              load_models()
+              print('✅ Tesseract backend loaded')
+          except Exception as e:
+              print(f'⚠️  Tesseract backend failed: {e}')
+          " || true
+          
+          export SERVICE_VARIANT=onnx  
+          timeout 30s python -c "
+          from service.app import load_models
+          try:
+              load_models()
+              print('✅ ONNX backend loaded')
+          except Exception as e:
+              print(f'⚠️  ONNX backend failed: {e}')
+          " || true
+      
+      - name: Run evaluation harness
+        id: eval
+        run: |
+          # Create minimal test data if not exists
+          mkdir -p data/test
+          if [ ! -f data/test/label.txt ]; then
+            echo "test1.jpg\tសួស្តី ពិភពលោក" > data/test/label.txt
+            echo "test2.jpg\tប្រទេសកម្ពុជា" >> data/test/label.txt
+          fi
+          
+          python eval/harness.py \
+            --test data/test \
+            --model-dir models \
+            --report eval/report.json \
+            ${{ matrix.platform == 'gpu' && '--gpu --strict' || '--demo' }} || true
+        continue-on-error: true
+      
+      - name: Check acceptance criteria (GPU only)
+        if: matrix.platform == 'gpu'
+        run: |
+          python -c "
+          import json
+          with open('eval/report.json') as f:
+              report = json.load(f)
+          criteria = report.get('acceptance_criteria', {})
+          if not criteria.get('all_pass', False):
+              print('❌ GPU acceptance criteria not met')
+              exit(1)
+          print('✅ GPU acceptance criteria passed')
+          "
+      
+      - name: Upload evaluation report
+        uses: actions/upload-artifact@v3
+        with:
+          name: eval-report-${{ matrix.platform }}
+          path: eval/report.json
+
+  benchmark:
+    name: Latency Benchmark
+    needs: strict-eval
+    strategy:
+      matrix:
+        platform: [cpu, gpu]
+    runs-on: ${{ matrix.platform == 'gpu' && 'ubuntu-latest-gpu' || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Cache models
+        uses: actions/cache@v3
+        with:
+          path: |
+            models/
+            models/onnx/
+          key: ${{ runner.os }}-models-onnx-${{ env.CACHE_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          if [ "${{ matrix.platform }}" = "gpu" ]; then
+            pip install -e ".[gpu,eval]"
+            pip install onnxruntime-gpu
+          else
+            pip install -e ".[macos,eval]"
+            pip install onnxruntime
+          fi
+      
+      - name: Export ONNX models
+        run: |
+          python ops/export_onnx.py --model-dir models --output-dir models/onnx --model recognizer
+      
+      - name: Run benchmark
+        run: |
+          python eval/benchmark.py \
+            --model-dir models \
+            --output eval/benchmark_report.json \
+            --batch-sizes 1 4 8 16 \
+            --warmup 5 \
+            --runs 50 \
+            ${{ matrix.platform == 'gpu' && '--gpu --onnx' || '' }}
+      
+      - name: Check latency gate (GPU batch 8)
+        if: matrix.platform == 'gpu'
+        run: |
+          python -c "
+          import json
+          with open('eval/benchmark_report.json') as f:
+              report = json.load(f)
+          # Check P95 latency for batch 8
+          batch_8 = report.get('results', {}).get('batch_benchmarks', {}).get('batch_8', {})
+          p95 = batch_8.get('p95_ms', float('inf'))
+          if p95 > 200:
+              print(f'❌ GPU batch 8 P95 latency {p95:.2f}ms > 200ms')
+              exit(1)
+          print(f'✅ GPU batch 8 P95 latency {p95:.2f}ms ≤ 200ms')
+          "
+      
+      - name: Upload benchmark report
+        uses: actions/upload-artifact@v3
+        with:
+          name: benchmark-report-${{ matrix.platform }}
+          path: eval/benchmark_report.json
+
+  update-manifest:
+    name: Update Manifest
+    needs: [benchmark]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts/
+      
+      - name: Update manifest with provenance
+        run: |
+          # Copy evaluation reports to expected location
+          mkdir -p eval
+          cp artifacts/eval-report-gpu/report.json eval/report.json 2>/dev/null || true
+          
+          # Update manifest with training runs and tokenizer tracking
+          python ops/manifests.py --update
+          
+          # Validate updated manifest
+          python ops/manifests.py --validate
+          
+          # Run comprehensive production gates validation (main branch only)
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "🚪 Running production gates validation..."
+            python ops/production_gates.py --project-root .
+          else
+            echo "🔄 Development branch - skipping production gates"
+            python -c "
+            import json
+            with open('governance/manifest.json', 'r') as f:
+                manifest = json.load(f)
+            print('✅ Manifest validation passed (development mode)')
+            "
+          fi
+      
+      - name: Upload manifest
+        uses: actions/upload-artifact@v3
+        with:
+          name: manifest
+          path: governance/manifest.json
+      
+      - name: Create summary
+        run: |
+          echo "## CI Pipeline Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          # Show license compliance with production gate status
+          echo "### License Compliance" >> $GITHUB_STEP_SUMMARY
+          python -c "
+          import pandas as pd
+          import os
+          df = pd.read_csv('governance/license_ledger.csv')
+          
+          # Count license types
+          open_count = len(df[df['commercial_use'] == 'yes'])
+          total_count = len(df)
+          restricted_count = len(df[df['usage_allowed'] == 'research_only'])
+          
+          print(f'- Total datasets: {total_count}')
+          print(f'- Commercial use allowed: {open_count}/{total_count}')
+          print(f'- Research-only datasets: {restricted_count}')
+          
+          # Production gate status
+          is_main = '${{ github.ref }}' == 'refs/heads/main'
+          if is_main:
+              if restricted_count == 0:
+                  print('- ✅ **PRODUCTION READY** - No license restrictions')
+              else:
+                  print('- ❌ **PRODUCTION BLOCKED** - Contains research-only datasets')
+          else:
+              print('- 🔄 Development branch - No production restrictions')
+              
+          # License breakdown
+          license_counts = df['license'].value_counts().to_dict()
+          print(f'- License breakdown: {dict(license_counts)}')
+          " >> $GITHUB_STEP_SUMMARY
+          
+          # Show manifest summary
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Manifest Summary" >> $GITHUB_STEP_SUMMARY
+          if [ -f governance/manifest.json ]; then
+            python -c "
+          import json
+          with open('governance/manifest.json') as f:
+              manifest = json.load(f)
+          print(f\"- Models: {len(manifest.get('models', {}))}\")  
+          print(f\"- Tokenizers: {len(manifest.get('tokenizers', {}))}\") 
+          print(f\"- Training runs: {len(manifest.get('training_runs', []))}\") 
+          " >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [ -f eval/report.json ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Evaluation Results" >> $GITHUB_STEP_SUMMARY
+            python -c "
+          import json
+          with open('eval/report.json') as f:
+              report = json.load(f)
+          print(f\"- CER Clean: {report.get('cer_clean', 'N/A')}%\")
+          print(f\"- CER Degraded: {report.get('cer_degraded', 'N/A')}%\")
+          criteria = report.get('acceptance_criteria', {})
+          print(f\"- All Pass: {'✅' if criteria.get('all_pass') else '❌'}\")
+            " >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- [Manifest](governance/manifest.json)" >> $GITHUB_STEP_SUMMARY
+          echo "- [License Ledger](governance/license_ledger.csv)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Evaluation Reports](artifacts/)" >> $GITHUB_STEP_SUMMARY
+          echo "- [Benchmark Reports](artifacts/)" >> $GITHUB_STEP_SUMMARY

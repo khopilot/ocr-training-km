@@ -1,0 +1,22 @@
+architecture: crnn_resnet34
+beam_width: 10
+charset: train/charset_kh.txt
+data:
+  format: paddleocr_rec
+  train_list: data/train/label.txt
+  val_list: data/val/label.txt
+input_size:
+- 3
+- 48
+- 320
+model_type: recognition
+optimizer:
+  lr: 0.0005
+  name: AdamW
+  weight_decay: 0.01
+output:
+  save_dir: models
+train:
+  amp: true
+  batch_size: 16
+  epochs: 1

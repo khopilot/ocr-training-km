@@ -1,0 +1,35 @@
+{
+  "evaluation_type": "DEMO/DEVELOPMENT",
+  "platform": "macOS M3",
+  "backend": "tesseract",
+  "timestamp": "2025-09-07 12:56:04",
+  "disclaimer": "This is demonstration mode with limited Khmer OCR capability",
+  "results": [
+    {
+      "image": "synth_00956.png",
+      "text": "ន ន Limited Recognition",
+      "lines_detected": 3,
+      "latency_ms": 292,
+      "backend": "tesseract"
+    },
+    {
+      "image": "synth_00942.png",
+      "text": "ន ន Limited Recognition",
+      "lines_detected": 3,
+      "latency_ms": 260,
+      "backend": "tesseract"
+    },
+    {
+      "image": "synth_00017.png",
+      "text": "ន ន Limited Recognition",
+      "lines_detected": 3,
+      "latency_ms": 259,
+      "backend": "tesseract"
+    }
+  ],
+  "summary": {
+    "images_processed": 3,
+    "avg_latency_ms": 270,
+    "total_lines": 9
+  }
+}

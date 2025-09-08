@@ -1,0 +1,21 @@
+# Minimal placeholder Recognition (CTC) config (to be replaced with PaddleOCR config)
+model_type: recognition
+architecture: crnn_resnet34
+input_size: [3, 48, 320]
+charset: train/charset_kh.txt
+beam_width: 10
+optimizer:
+  name: AdamW
+  lr: 0.0005
+  weight_decay: 0.01
+train:
+  epochs: 10
+  batch_size: 64
+  amp: true
+data:
+  train_list: data/train/label.txt
+  val_list: data/val/label.txt
+  format: paddleocr_rec
+output:
+  save_dir: models
+

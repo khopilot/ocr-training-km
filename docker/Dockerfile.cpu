@@ -1,0 +1,105 @@
+# CPU-only Dockerfile for Khmer OCR (development/testing)
+FROM python:3.11-slim AS base
+
+# Set environment
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    LANG=C.UTF-8
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    cmake \
+    git \
+    wget \
+    libgomp1 \
+    libopenblas-dev \
+    libboost-all-dev \
+    libeigen3-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# ============ Builder Stage ============
+FROM base AS builder
+
+WORKDIR /build
+
+# Build KenLM
+RUN git clone https://github.com/kpu/kenlm.git /build/kenlm \
+    && cd /build/kenlm \
+    && mkdir build \
+    && cd build \
+    && cmake .. \
+    && make -j$(nproc) \
+    && make install \
+    && ldconfig
+
+# Copy requirements and install Python packages
+COPY pyproject.toml /build/
+RUN python -m pip install --upgrade pip setuptools wheel \
+    && pip install paddlepaddle==2.6.1 \
+    && pip install paddleocr==2.7.0 \
+    && pip install onnxruntime==1.18.1 \
+    && pip install sentencepiece==0.1.99 \
+    && pip install transformers>=4.30.0
+
+# ============ Runtime Stage ============
+FROM base AS runtime
+
+# Copy KenLM from builder
+COPY --from=builder /usr/local/bin/lmplz /usr/local/bin/
+COPY --from=builder /usr/local/bin/build_binary /usr/local/bin/
+COPY --from=builder /usr/local/lib/libkenlm* /usr/local/lib/
+RUN ldconfig
+
+# Create non-root user
+RUN groupadd -r ocr && useradd -r -g ocr -m -s /bin/bash ocr
+
+WORKDIR /app
+
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+
+# Copy application code
+COPY --chown=ocr:ocr . /app/
+
+# Install application
+RUN python -m pip install --no-deps -e .
+
+# Create necessary directories
+RUN mkdir -p /app/models /app/data /app/logs /app/lang/tokenizer \
+    && chown -R ocr:ocr /app
+
+# Vendor tokenizer for offline use
+RUN python -c "from transformers import AutoTokenizer; \
+    tokenizer = AutoTokenizer.from_pretrained('khopilot/km-tokenizer-khmer'); \
+    tokenizer.save_pretrained('/app/lang/tokenizer/khopilot')" || \
+    echo "Warning: Could not download tokenizer, will use online"
+
+# Environment variables
+ENV SERVICE_VARIANT=paddle \
+    TOKENIZER_PATH=/app/lang/tokenizer/khopilot \
+    MODEL_DIR=/app/models \
+    USE_GPU=false \
+    WORKERS=2 \
+    PORT=8080
+
+# Switch to non-root user
+USER ocr
+
+# Download PaddleOCR pretrained models
+RUN python -c "from paddleocr import PaddleOCR; \
+    PaddleOCR(use_angle_cls=False, lang='en', use_gpu=False)" || \
+    echo "Warning: Could not pre-download PaddleOCR models"
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD python -c "import requests; r = requests.get('http://localhost:8080/health'); exit(0 if r.status_code == 200 else 1)"
+
+# Expose port
+EXPOSE 8080
+
+# Run service
+CMD ["python", "-m", "uvicorn", "service.app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "2"]

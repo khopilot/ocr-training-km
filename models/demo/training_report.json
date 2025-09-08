@@ -1,0 +1,36 @@
+{
+  "training_type": "DEMO/DEVELOPMENT",
+  "platform": "macOS M3",
+  "engine": "Mock PaddleOCR",
+  "config": "models/demo/quick_config.yaml",
+  "dataset_size": {
+    "train": 500,
+    "val": 100
+  },
+  "charset_size": 186,
+  "training_params": {
+    "epochs": 1,
+    "batch_size": 16,
+    "architecture": "crnn_resnet34"
+  },
+  "final_metrics": {
+    "train_loss": 3.9629854472673047,
+    "val_loss": 3.5138595184056003,
+    "best_val_loss": 3.5138595184056003
+  },
+  "timing": {
+    "total_time_sec": 0.5250821113586426,
+    "avg_epoch_time": 0.5250821113586426
+  },
+  "training_log": [
+    {
+      "epoch": 1,
+      "train_loss": 3.9629854472673047,
+      "val_loss": 3.5138595184056003,
+      "epoch_time": 0.43799519538879395,
+      "timestamp": 1757226044.467255
+    }
+  ],
+  "timestamp": "2025-09-07 13:20:44",
+  "disclaimer": "This is DEMO training with mock PaddleOCR for development purposes"
+}

@@ -1,0 +1,71 @@
+# Recognition (CTC) config for HuggingFace datasets
+model_type: recognition
+architecture: crnn_resnet34
+input_size: [3, 48, 320]
+charset: lang/lexicon/charset_khmer.txt
+beam_width: 10
+
+optimizer:
+  name: AdamW
+  lr: 0.0005
+  weight_decay: 0.01
+  scheduler:
+    name: CosineAnnealingLR
+    T_max: 30
+
+train:
+  epochs: 30
+  batch_size: 64
+  amp: true
+  seed: 42
+  eval_steps: 200
+  save_steps: 500
+  
+data:
+  # Combined dataset paths
+  train_lists:
+    - data/paddle_format/recognition/train/label.txt  # SynthKhmer-10k
+    - data/paddle_format/fonts_recognition/label.txt  # khmerfonts-info-previews
+  val_list: data/paddle_format/recognition/val/label.txt
+  test_list: data/paddle_format/recognition/test/label.txt
+  format: paddleocr_rec
+  
+  # Data augmentation for recognition
+  augmentation:
+    - type: RandomCrop
+      prob: 0.2
+    - type: RandomRotate
+      degree: 5
+    - type: ColorJitter
+      brightness: 0.15
+      contrast: 0.15
+    - type: GaussianNoise
+      prob: 0.1
+      
+# Language model integration
+language_model:
+  type: kenlm
+  model_path: lang/kenlm/khmer_5gram.bin
+  lexicon_path: lang/lexicon/khmer_lexicon.txt
+  lambda: 0.3  # LM weight
+  mu: 0.1      # Lexicon penalty weight
+  
+output:
+  save_dir: models/rec_khmer_hf
+  log_interval: 50
+  
+metrics:
+  - cer  # Character Error Rate
+  - wer  # Word Error Rate
+  - accuracy
+
+# Dataset attribution
+datasets:
+  - name: SynthKhmer-10k
+    source: seanghay/SynthKhmer-10k
+    license: CC-BY-4.0
+    samples: 10000
+  - name: khmerfonts-info-previews
+    source: seanghay/khmerfonts-info-previews
+    license: CC-BY-4.0
+    samples: 26591

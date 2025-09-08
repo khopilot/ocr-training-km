@@ -1,0 +1,139 @@
+name: ML Pipeline Orchestrator
+type: ml-pipeline-orchestrator
+description: Orchestrates the complete Khmer OCR training pipeline
+
+tasks:
+  data_preparation:
+    priority: 1
+    steps:
+      - name: Download HuggingFace datasets
+        command: make download-hf
+        validation: check_hf_data_exists
+      - name: Build unified lexicon
+        command: python ops/build_lexicon.py --input-dir data/hf_datasets --output-dir lang/lexicon --open-only
+        output: lang/lexicon/khmer_lexicon.txt
+      - name: Build training corpus
+        command: python ops/build_corpus.py --input-dirs data/paddle_format --output data/corpus/khmer_training_corpus.txt
+        output: data/corpus/khmer_training_corpus.txt
+      - name: Generate charset
+        command: make charset
+        output: train/charset_kh.txt
+      - name: Generate synthetic data (optional)
+        command: make synth
+        output: data/synth/
+        optional: true
+    
+  model_training:
+    priority: 2
+    dependencies: [data_preparation]
+    steps:
+      - name: Train DBNet detector
+        command: make docker-train-det
+        gpu_required: true
+        timeout: 14400
+        output: models/dbnet/
+      - name: Train CTC recognizer 
+        command: make docker-train-rec
+        gpu_required: true
+        timeout: 14400
+        output: models/rec_kh/
+      - name: Train KenLM language model with HF tokenizer
+        command: make docker-train-lm
+        timeout: 1800
+        output: lang/kenlm/khmer_5gram.arpa
+    
+  evaluation:
+    priority: 3
+    dependencies: [model_training]
+    steps:
+      - name: Run strict CER evaluation
+        command: make eval
+        metrics:
+          - cer_clean
+          - cer_degraded  
+          - latency_p95
+        output: eval/report.json
+        validation: check_acceptance_criteria
+      - name: Run rescoring parameter sweep
+        command: python eval/rescoring_sweep.py --test data/test --model-dir models --output eval/rescoring_results.json
+        output: eval/rescoring_results.json
+      - name: Performance benchmarking
+        command: make bench
+        output: eval/benchmark.json
+      - name: Cross-check with Tesseract (sample)
+        command: python ops/tess_check.py --sample 0.05
+        optional: true
+
+  optimization:
+    priority: 4
+    dependencies: [evaluation]
+    conditional: if_metrics_below_target
+    steps:
+      - name: Export to ONNX for cross-platform deployment
+        command: python ops/export_onnx.py --model-dir models --output-dir models/onnx --models recognizer detector
+        output: models/onnx/
+      - name: Model quantization (optional)
+        command: python ops/quantize.py --fp16 --model-dir models
+        optional: true
+      - name: Update manifest with model tracking
+        command: python ops/manifests.py --update
+        output: governance/manifest.json
+
+monitoring:
+  log_file: .claude/logs/pipeline.log
+  metrics_db: ~/.claude/metrics.db
+  checkpoints:
+    save_interval: 1000
+    keep_best: 3
+  alerts:
+    - condition: cer_clean > 0.03
+      action: notify_user
+      message: "CER clean target exceeded (>3%)"
+    - condition: cer_degraded > 0.10
+      action: notify_user  
+      message: "CER degraded target exceeded (>10%)"
+    - condition: latency_p95 > 200
+      action: notify_user
+      message: "Latency P95 target exceeded (>200ms)"
+    - condition: training_loss_stagnant
+      action: early_stop
+  production_gates:
+    - name: license_compliance
+      check: "python -c 'import pandas as pd; df=pd.read_csv(\"governance/license_ledger.csv\"); exit(1 if len(df[df[\"usage_allowed\"]==\"research_only\"])>0 else 0)'"
+      required: true
+    - name: model_validation
+      check: "python ops/manifests.py --validate"
+      required: true
+
+artifacts:
+  models:
+    - path: models/dbnet/*.pdparams
+      hash_required: true
+      type: detection
+    - path: models/rec_kh/*.pdparams  
+      hash_required: true
+      type: recognition
+    - path: models/onnx/*.onnx
+      hash_required: true
+      type: cross_platform
+    - path: lang/kenlm/*.arpa
+      hash_required: true
+      type: language_model
+  configs:
+    - path: train/configs/*.yaml
+      versioned: true
+    - path: train/charset_kh.txt
+      hash_required: true
+  reports:
+    - path: eval/report.json
+      required: true
+    - path: eval/benchmark.json
+      required: true
+    - path: governance/manifest.json
+      required: true
+      versioned: true
+  governance:
+    - path: governance/license_ledger.csv
+      required: true
+    - path: governance/dataset_card.md
+      optional: true

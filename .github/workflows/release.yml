@@ -1,0 +1,161 @@
+name: Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v0.1.0)'
+        required: true
+
+env:
+  PYTHON_VERSION: "3.11"
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-test:
+    name: Build and Test Release
+    runs-on: ubuntu-latest-gpu
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[gpu,eval]"
+          pip install build twine
+      
+      - name: Run full evaluation
+        run: |
+          python eval/harness.py --test data/test --gpu --strict --report eval/report.json
+      
+      - name: Build Python package
+        run: |
+          python -m build
+      
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-package
+          path: dist/
+
+  build-docker:
+    name: Build Docker Images
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        variant: [gpu, cpu]
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository }}-${{ matrix.variant }}
+          tags: |
+            type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha
+      
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile.${{ matrix.variant }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            BUILD_DATE=${{ github.event.repository.updated_at }}
+
+  create-release:
+    name: Create GitHub Release
+    needs: [build-and-test, build-docker]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          path: artifacts/
+      
+      - name: Generate release notes
+        id: notes
+        run: |
+          cat << EOF > release_notes.md
+          ## Khmer OCR ${{ github.ref_name }}
+          
+          ### 🚀 Features
+          - Production-grade Khmer OCR with PaddleOCR + KenLM
+          - CER ≤ 3% (clean), ≤ 10% (degraded)
+          - P95 latency ≤ 200ms (GPU batch 8)
+          
+          ### 📦 Docker Images
+          - GPU: \`${{ env.REGISTRY }}/${{ github.repository }}-gpu:${{ github.ref_name }}\`
+          - CPU: \`${{ env.REGISTRY }}/${{ github.repository }}-cpu:${{ github.ref_name }}\`
+          
+          ### 📊 Performance Metrics
+          See attached evaluation and benchmark reports.
+          
+          ### 🔧 Installation
+          \`\`\`bash
+          pip install kh-ocr==${{ github.ref_name }}
+          # or
+          docker pull ${{ env.REGISTRY }}/${{ github.repository }}-gpu:${{ github.ref_name }}
+          \`\`\`
+          EOF
+      
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: "artifacts/python-package/dist/*,artifacts/eval-report-gpu/*,artifacts/benchmark-report-gpu/*"
+          bodyFile: release_notes.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'rc') || contains(github.ref_name, 'beta') }}
+
+  deploy-helm:
+    name: Package Helm Chart
+    needs: build-docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Helm
+        uses: azure/setup-helm@v3
+      
+      - name: Package Helm chart
+        run: |
+          cd deploy/helm
+          helm package khmer-ocr --version ${GITHUB_REF_NAME#v}
+      
+      - name: Upload Helm chart
+        uses: actions/upload-artifact@v3
+        with:
+          name: helm-chart
+          path: deploy/helm/*.tgz

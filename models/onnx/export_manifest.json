@@ -1,0 +1,19 @@
+{
+  "export_type": "ONNX_DEMO",
+  "platform": "macOS M3",
+  "framework": "PaddleOCR",
+  "timestamp": "2025-09-07 13:24:30",
+  "models": {
+    "detection": {
+      "path": "models/onnx/dbnet_detection.onnx",
+      "size_mb": 2.47955322265625e-05,
+      "format": "ONNX"
+    },
+    "recognition": {
+      "path": "models/onnx/crnn_recognition.onnx",
+      "size_mb": 2.47955322265625e-05,
+      "format": "ONNX"
+    }
+  },
+  "disclaimer": "These are DEMO ONNX models for development purposes"
+}

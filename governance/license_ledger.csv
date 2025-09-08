@@ -1,0 +1,7 @@
+dataset,source,license,usage_allowed,restrictions,attribution_required,commercial_use,distribution_allowed,modification_allowed,notes
+khmer-dictionary-44k,seanghay/khmer-dictionary-44k,MIT,yes,none,no,yes,yes,yes,Open source Khmer dictionary
+google-khmer-lexicon,seanghay/google-khmer-lexicon,proprietary,research_only,no_commercial,yes,no,no,no,Google's proprietary lexicon - research only
+lexicon-kh,seanghay/lexicon-kh,CC-BY-SA-4.0,yes,share_alike,yes,yes,yes,yes,Creative Commons ShareAlike
+SynthKhmer-10k,seanghay/SynthKhmer-10k,MIT,yes,none,no,yes,yes,yes,Synthetic Khmer dataset
+khmerfonts-info-previews,seanghay/khmerfonts-info-previews,OFL+MIT,yes,font_specific,yes,yes,yes,yes,Font previews with mixed licensing
+khopilot-km-tokenizer,khopilot/km-tokenizer-khmer,Apache-2.0,yes,none,yes,yes,yes,yes,User's own tokenizer model

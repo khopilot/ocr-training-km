@@ -1,0 +1,134 @@
+name: Model Evaluation & QA
+type: model-evaluation-qa
+description: Comprehensive evaluation and quality assurance for Khmer OCR models
+
+evaluation_suite:
+  metrics:
+    primary:
+      - name: CER (Character Error Rate)
+        implementation: eval/cer.py
+        targets:
+          clean: 0.03
+          degraded: 0.10
+      - name: WER (Word Error Rate)
+        implementation: eval/wer.py
+        targets:
+          clean: 0.05
+          degraded: 0.15
+    
+    performance:
+      - name: Latency P95
+        implementation: eval/bench.py
+        target: 200ms
+        conditions: GPU_batch_8
+      - name: Throughput
+        implementation: eval/bench.py
+        target: 50_pages_per_minute
+        conditions: GPU_batch_8
+    
+    quality:
+      - name: Diacritic accuracy
+        implementation: eval/diacritics.py
+        target: 0.95
+      - name: Number accuracy
+        implementation: eval/numbers.py
+        target: 0.99
+      - name: Punctuation accuracy
+        implementation: eval/punctuation.py
+        target: 0.95
+
+  test_sets:
+    standard:
+      - name: clean_print
+        path: data/test/clean/
+        samples: 1000
+        characteristics: high_quality_scans
+      - name: degraded_print
+        path: data/test/degraded/
+        samples: 500
+        characteristics: [blur, noise, skew]
+      - name: synthetic
+        path: data/test/synthetic/
+        samples: 2000
+        characteristics: generated_samples
+    
+    edge_cases:
+      - name: handwriting
+        path: data/test/handwriting/
+        expected_performance: baseline_only
+      - name: mixed_script
+        path: data/test/mixed/
+        description: Khmer + English/numbers
+      - name: historical_texts
+        path: data/test/historical/
+        expected_performance: degraded
+
+  ablation_studies:
+    components:
+      - name: CTC_only
+        config: disable_language_model
+        compare_to: baseline
+      - name: CTC_with_KenLM
+        config: enable_kenlm_only
+        compare_to: CTC_only
+      - name: Full_pipeline
+        config: enable_all
+        compare_to: CTC_with_KenLM
+    
+    hyperparameters:
+      - name: LM_weight_sweep
+        param: lambda
+        values: [0.1, 0.2, 0.3, 0.4, 0.5]
+      - name: Lexicon_weight_sweep
+        param: mu
+        values: [0.0, 0.05, 0.1, 0.15]
+      - name: Beam_size_sweep
+        param: beam_width
+        values: [5, 10, 20, 50]
+
+  regression_tests:
+    golden_set:
+      path: data/golden/
+      samples: 100
+      tolerance: 0.001
+    checks:
+      - no_performance_degradation
+      - no_new_failure_modes
+      - consistent_unicode_handling
+
+  hallucination_detection:
+    methods:
+      - name: Perplexity threshold
+        implementation: eval/perplexity.py
+        threshold: 1000
+      - name: Dictionary lookup
+        implementation: eval/dictionary_check.py
+        min_valid_ratio: 0.8
+      - name: Length consistency
+        implementation: eval/length_check.py
+        max_expansion_ratio: 1.5
+
+  reports:
+    formats:
+      - json: eval/report.json
+      - html: eval/report.html
+      - markdown: eval/report.md
+    
+    contents:
+      - metric_summary
+      - confusion_matrix
+      - error_analysis
+      - sample_predictions
+      - ablation_results
+      - performance_charts
+      - recommendations
+
+  continuous_monitoring:
+    schedule: on_commit
+    alerts:
+      - metric: cer_clean
+        condition: increase > 0.005
+        action: block_deployment
+      - metric: latency_p95
+        condition: increase > 20ms
+        action: warn_developer

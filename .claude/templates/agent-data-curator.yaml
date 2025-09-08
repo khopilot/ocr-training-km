@@ -1,0 +1,105 @@
+name: Data Curator for Khmer OCR
+type: data-curator-annotator
+description: Manages dataset preparation, annotation, and quality control
+
+tasks:
+  data_collection:
+    sources:
+      - name: khmer_print_corpus
+        type: public_dataset
+        url: https://huggingface.co/datasets/khmer-text
+        license: check_required
+      - name: synthetic_generation
+        type: generated
+        generator: TextRenderer
+        fonts: [KhmerOS, Hanuman, Battambang]
+        count: 50000
+    
+  preprocessing:
+    steps:
+      - name: Image normalization
+        operations:
+          - resize_to_max: 2048
+          - convert_to_grayscale: optional
+          - deskew: true
+          - denoise: moderate
+      - name: Text cleaning
+        operations:
+          - unicode_normalize: NFC
+          - remove_zwsp: true
+          - fix_diacritics: true
+          - validate_charset: train/charset_kh.txt
+    
+  annotation:
+    format: COCO
+    structure:
+      image_id: string
+      text: string
+      lines:
+        - bbox: [x, y, width, height]
+          text: string
+          confidence: float
+      metadata:
+        source: string
+        quality: [clean, degraded, synthetic]
+        font_size: int
+        dpi: int
+    
+  quality_control:
+    validation:
+      - name: Character coverage
+        check: all_chars_in_charset
+        threshold: 0.99
+      - name: Annotation completeness
+        check: no_missing_fields
+        threshold: 1.0
+      - name: Image quality
+        check: minimum_resolution
+        threshold: 150_dpi
+      - name: Text length
+        check: reasonable_length
+        min: 1
+        max: 1000
+    
+  augmentation:
+    techniques:
+      - name: Degradation
+        types: [blur, noise, compression, perspective]
+        ratio: 0.3
+      - name: Font variation
+        fonts: 12
+        sizes: [10, 12, 14, 16, 18, 24]
+      - name: Background variation
+        types: [paper, gradient, texture]
+        ratio: 0.2
+    
+  balancing:
+    strategies:
+      - name: Length distribution
+        bins: [short, medium, long]
+        target_ratio: [0.3, 0.5, 0.2]
+      - name: Quality distribution
+        categories: [clean, degraded, synthetic]
+        target_ratio: [0.5, 0.3, 0.2]
+      - name: Character frequency
+        method: weighted_sampling
+        smooth_factor: 0.8
+
+  splitting:
+    ratios:
+      train: 0.8
+      val: 0.1
+      test: 0.1
+    stratify_by: [quality, length]
+    seed: 42
+    
+output:
+  format: paddle_ocr
+  structure:
+    train_list: data/train/label.txt
+    val_list: data/val/label.txt
+    test_list: data/test/label.txt
+  metadata:
+    stats: data/dataset_stats.json
+    license: governance/license_ledger.csv
+    card: governance/dataset_card.md

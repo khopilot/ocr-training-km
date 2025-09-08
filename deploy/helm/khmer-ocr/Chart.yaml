@@ -1,0 +1,18 @@
+apiVersion: v2
+name: khmer-ocr
+description: Production-grade Khmer OCR service with PaddleOCR and KenLM
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - ocr
+  - khmer
+  - paddleocr
+  - machine-learning
+home: https://github.com/khopilot/khmer-ocr
+sources:
+  - https://github.com/khopilot/khmer-ocr
+maintainers:
+  - name: khopilot
+    email: niko@khopilot.ai
+dependencies: []

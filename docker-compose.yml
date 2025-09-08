@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  khmer-ocr:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.cpu
+    image: khmer-ocr:latest
+    container_name: khmer-ocr
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVICE_VARIANT=${SERVICE_VARIANT:-paddle}
+      - TOKENIZER_PATH=/app/lang/tokenizer/khopilot
+      - MODEL_DIR=/app/models
+      - USE_GPU=false
+      - WORKERS=2
+      - LOG_LEVEL=info
+    volumes:
+      - ./models:/app/models:ro
+      - ./data:/app/data:ro
+      - ./lang:/app/lang:ro
+      - ocr-logs:/app/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    networks:
+      - ocr-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - ocr-network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana-dashboard.json:/var/lib/grafana/dashboards/ocr.json:ro
+    networks:
+      - ocr-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+networks:
+  ocr-network:
+    driver: bridge
+
+volumes:
+  ocr-logs:
+  prometheus-data:
+  grafana-data:

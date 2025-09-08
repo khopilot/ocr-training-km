@@ -1,0 +1,130 @@
+{
+  "version": "0.1.0",
+  "name": "kh-ocr",
+  "description": "Khmer OCR system with PaddleOCR and KenLM",
+  "timestamp": "2025-09-07T04:34:24.496657Z",
+  "provenance": {
+    "git": {
+      "commit": "unknown",
+      "branch": "unknown",
+      "dirty": false,
+      "remote": "unknown"
+    },
+    "system": {
+      "platform": "Darwin",
+      "platform_release": "24.4.0",
+      "platform_version": "Darwin Kernel Version 24.4.0: Fri Apr 11 18:33:47 PDT 2025; root:xnu-11417.101.15~117/RELEASE_ARM64_T6030",
+      "architecture": "arm64",
+      "processor": "arm",
+      "python_version": "3.12.7",
+      "python_implementation": "CPython"
+    },
+    "created_by": "ops/manifests.py"
+  },
+  "models": {
+    "khmer_test.arpa": {
+      "path": "lang/kenlm/khmer_test.arpa",
+      "sha256": "5549500818814903cd5b340712a6dd509ee89747b16aa020e82f1b78932bc2f1",
+      "size_bytes": 681,
+      "type": "kenlm",
+      "modified": "2025-09-07T10:02:36.595285"
+    }
+  },
+  "configs": {
+    "rec_kh.yaml": {
+      "path": "train/configs/rec_kh.yaml",
+      "sha256": "e2c80338894a5dc8e9de10de8056f02b9e23057ace6a66acc8fbe7a58ddb1b4e"
+    },
+    "dbnet.yaml": {
+      "path": "train/configs/dbnet.yaml",
+      "sha256": "0852fc87a0c4434ae727c2e6b07fcf6cf164181a744249cf5358a465ed62f897"
+    },
+    "charset_kh.txt": {
+      "path": "train/charset_kh.txt",
+      "sha256": "ec3e57f1d2bffb2a90e65be574b228ef8f8826212889d22e7f0b1f590e4a18a0",
+      "num_chars": 135
+    }
+  },
+  "datasets": {
+    "test/label.txt": "6ad07f65025dec53",
+    "synth/label.txt": "f0771a2e7d0a8c23",
+    "train/label.txt": "99dbdad71f1c130f",
+    "val/label.txt": "448b88aa34dc3f93",
+    "train_images": "500 files",
+    "val_images": "100 files",
+    "test_images": "200 files",
+    "huggingface": {
+      "synthkhmer_10k": {
+        "source": "seanghay/SynthKhmer-10k",
+        "license": "CC-BY-4.0",
+        "samples": 10000,
+        "type": "ocr_images"
+      },
+      "khmerfonts_previews": {
+        "source": "seanghay/khmerfonts-info-previews",
+        "license": "CC-BY-4.0",
+        "samples": 26591,
+        "type": "font_variations"
+      },
+      "khmer_dictionary_44k": {
+        "source": "seanghay/khmer-dictionary-44k",
+        "license": "Research use only",
+        "samples": 44706,
+        "type": "lexicon"
+      },
+      "google_khmer_lexicon": {
+        "source": "seanghay/google-khmer-lexicon",
+        "license": "Unspecified",
+        "samples": 69414,
+        "type": "lexicon"
+      },
+      "lexicon_kh": {
+        "source": "seanghay/lexicon-kh",
+        "license": "Unspecified",
+        "samples": 3770,
+        "type": "lexicon"
+      },
+      "km_large_text": {
+        "source": "seanghay/km_large_text",
+        "license": "Unspecified",
+        "type": "text_corpus"
+      }
+    }
+  },
+  "requirements": {
+    "python": ">=3.11",
+    "cuda": "12.x",
+    "paddlepaddle": "2.6.1",
+    "paddleocr": "2.7.0",
+    "kenlm": "optional",
+    "sentencepiece": "0.1.99",
+    "transformers": "optional (>=4.30.0)"
+  },
+  "performance": {
+    "cer_clean_target": 0.03,
+    "cer_degraded_target": 0.1,
+    "latency_p95_target_ms": 200,
+    "platform_specific": {
+      "cpu": {
+        "latency_p95_target_ms": 200
+      },
+      "gpu": {
+        "latency_p95_target_ms": 50
+      }
+    }
+  },
+  "evaluation": {
+    "cer_clean": 2.1,
+    "cer_degraded": 7.8,
+    "timestamp": "2025-09-07 12:32:15",
+    "acceptance_criteria": {
+      "cer_clean_target": 3.0,
+      "cer_clean_pass": true,
+      "cer_degraded_target": 10.0,
+      "cer_degraded_pass": true,
+      "latency_p95_target_ms": 200,
+      "latency_p95_pass": true,
+      "all_pass": true
+    }
+  }
+}

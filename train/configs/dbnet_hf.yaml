@@ -1,0 +1,54 @@
+# DBNet Detection config for HuggingFace datasets
+model_type: dbnet
+backbone: mobilenetv3_large
+image_size: [960, 960]
+
+optimizer:
+  name: AdamW
+  lr: 0.001
+  weight_decay: 0.01
+  scheduler:
+    name: CosineAnnealingLR
+    T_max: 10
+
+train:
+  epochs: 20
+  batch_size: 8
+  amp: true
+  seed: 42
+  eval_steps: 500
+  save_steps: 1000
+  
+data:
+  # SynthKhmer-10k converted to PaddleOCR format
+  train_list: data/paddle_format/detection/train/label.txt
+  val_list: data/paddle_format/detection/val/label.txt
+  test_list: data/paddle_format/detection/test/label.txt
+  format: paddleocr_det
+  
+  # Data augmentation
+  augmentation:
+    - type: RandomCrop
+      prob: 0.3
+    - type: RandomRotate
+      degree: 15
+    - type: ColorJitter
+      brightness: 0.2
+      contrast: 0.2
+      
+output:
+  save_dir: models/dbnet_synthkhmer
+  log_interval: 50
+  
+metrics:
+  - precision
+  - recall
+  - f1_score
+  - hmean
+
+# Dataset attribution
+dataset:
+  name: SynthKhmer-10k
+  source: seanghay/SynthKhmer-10k
+  license: CC-BY-4.0
+  samples: 10000

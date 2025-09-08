@@ -1,0 +1,102 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+env/
+
+# Claude Configuration (local only)
+.claude/logs/
+.claude/shell-snapshots/
+.claude/*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# ML/Data
+data/raw/
+data/train/
+data/val/
+data/test/
+data/synth/
+*.pdparams
+*.pdmodel
+*.onnx
+*.pb
+*.pth
+*.h5
+*.arpa
+*.bin
+models/checkpoints/
+models/exports/
+
+# Logs and metrics
+*.log
+logs/
+runs/
+eval/report.json
+eval/report.html
+eval/*.png
+.claude/metrics.db
+
+# Temporary files
+tmp/
+temp/
+cache/
+*.tmp
+
+# Credentials (NEVER commit)
+.env
+.env.local
+*.key
+*.pem
+credentials.json
+secrets.yaml
+
+# Output files
+out/
+output/
+results/
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+.pytest_cache/
+
+# Documentation builds
+docs/_build/
+site/
+
+# OS files
+Thumbs.db
+.DS_Store

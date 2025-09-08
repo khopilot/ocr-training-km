@@ -1,0 +1,166 @@
+# SaladCloud Container Group Configuration for Khmer OCR Training
+apiVersion: v1
+kind: ContainerGroup
+metadata:
+  name: khmer-ocr-training
+  organization: khmer-ocr
+  project: khmer-ocr-gpu-training
+  labels:
+    task: ocr-training
+    model: khmer
+    framework: paddleocr
+
+spec:
+  # Container configuration
+  container:
+    image: nvidia/cuda:12.1.0-devel-ubuntu22.04
+    command: ["/bin/bash"]
+    args: ["/app/deploy/salad/training-entrypoint.sh"]
+    
+    # Resource requirements for 8x L40S GPUs
+    resources:
+      cpu: 128
+      memory: 512Gi
+      gpu_classes:
+        - name: rtx_4090_24gb  # Adjust based on actual L40S class name
+          quantity: 8
+      storage_mounts:
+        - name: models-storage
+          mount_path: /app/models
+          size: 500Gi
+        - name: data-cache
+          mount_path: /app/data
+          size: 200Gi
+        - name: logs-storage
+          mount_path: /app/logs
+          size: 50Gi
+    
+    # Environment variables
+    environment_variables:
+      - name: CUDA_VISIBLE_DEVICES
+        value: "0,1,2,3,4,5,6,7"
+      - name: NVIDIA_VISIBLE_DEVICES
+        value: "all"
+      - name: SERVICE_VARIANT
+        value: "paddle"
+      - name: PRODUCTION_MODE  
+        value: "prod"
+      - name: USE_GPU
+        value: "true"
+      - name: NUM_GPUS
+        value: "8"
+      - name: BATCH_SIZE_PER_GPU
+        value: "16" 
+      - name: TOTAL_BATCH_SIZE
+        value: "128"
+      - name: PYTHONUNBUFFERED
+        value: "1"
+      - name: PYTHONDONTWRITEBYTECODE
+        value: "1"
+      - name: HUGGING_FACE_HUB_TOKEN
+        value_from:
+          secret:
+            name: hf-token
+            key: token
+      
+    # Working directory
+    working_directory: /app
+    
+    # Startup probe to handle long initialization
+    startup_probe:
+      http_get:
+        path: /health
+        port: 8080
+      initial_delay_seconds: 300
+      timeout_seconds: 30
+      period_seconds: 10
+      failure_threshold: 30
+
+  # Networking  
+  networking:
+    protocol: http
+    port: 8080
+    auth: false
+    
+  # Replica configuration
+  replicas:
+    min: 1
+    max: 1
+    desired: 1
+    
+  # Auto-scaling (disabled for training)
+  autoscaling:
+    enabled: false
+    
+  # Restart policy for training workloads
+  restart_policy:
+    restart_policy: never
+    max_restarts: 0
+    
+  # Probes and health checks
+  probes:
+    liveness_probe:
+      http_get:
+        path: /health
+        port: 8080
+      initial_delay_seconds: 600
+      timeout_seconds: 30
+      period_seconds: 60
+      failure_threshold: 3
+      
+    readiness_probe:
+      http_get:
+        path: /ready
+        port: 8080
+      initial_delay_seconds: 180
+      timeout_seconds: 10
+      period_seconds: 30
+      failure_threshold: 3
+
+  # Logging configuration
+  logging:
+    axiom:
+      hostname: api.axiom.co
+      dataset: khmer-ocr-training-logs
+      token:
+        source_type: secret
+        secret_name: axiom-token
+        secret_key: token
+
+  # Webhook notifications
+  queue_connection:
+    path: /webhook
+    port: 8080
+    
+  # Container lifecycle
+  lifecycle:
+    # Setup phase
+    pre_start:
+      exec:
+        command: ["/bin/bash", "-c", "mkdir -p /app/{models,data,logs} && chown -R 1000:1000 /app"]
+    
+    # Cleanup phase  
+    pre_stop:
+      exec:
+        command: ["/bin/bash", "-c", "pkill -f python && sync"]
+    
+  # Priority and scheduling
+  priority: normal
+  country_codes: ["us", "ca"]
+  
+  # Training budget and limits
+  budget:
+    hourly_budget: 10.0
+    daily_budget: 50.0
+    
+  # Container image pull policy
+  image_pull_policy: always
+  
+  # Secrets for secure configuration
+  secrets:
+    - name: salad-api-key
+      data:
+        api_key: c2FsYWRfY2xvdWRfdXNlcl9xaTJua0Jnc2xRVTRBdUp2YWtJOWxtcTBDZk1FV09hTGEycDdmZFhnYVFVM21YZ2RNPQ==
+    - name: webhook-secret  
+      data:
+        secret: bUpkbnpGZVB5SjY4SnJXNVhZNzNJVkFTT2RaOU9aZ3V4aUNKYy9JM05Pekw1WGdpd2JIZ3lHemhPNDdka1dnZzdKNDA1SWR4eU5pVUI3Tk5XdngzdkE9PQ==

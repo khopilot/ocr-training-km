@@ -1,0 +1,19 @@
+# Minimal placeholder DBNet config (to be replaced with PaddleOCR config)
+model_type: dbnet
+backbone: mobilenetv3_large
+image_size: [960, 960]
+optimizer:
+  name: AdamW
+  lr: 0.001
+  weight_decay: 0.01
+train:
+  epochs: 10
+  batch_size: 8
+  amp: true
+data:
+  train_list: data/train/label.txt
+  val_list: data/val/label.txt
+  format: paddleocr_det
+output:
+  save_dir: models
+
