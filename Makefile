@@ -183,7 +183,7 @@ train-rec: ## Train recognition model (bare-metal, no Docker)
 
 eval: ## Run evaluation harness (auto-detect backend)
 	@echo "$(YELLOW)Running evaluation...$(NC)"
-	@$(PYTHON_BIN) -m eval.harness --test data/test --report eval/report.json
+	@$(PYTHON_BIN) -m eval.harness --test data/paddle_format/recognition/test --report eval/report.json
 	@echo "$(GREEN)✓ Evaluation complete! Report: eval/report.json$(NC)"
 
 eval-demo: ## Run demo evaluation (macOS with clear labels)

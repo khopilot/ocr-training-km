@@ -15,17 +15,17 @@ optimizer:
 
 train:
   epochs: 10  # Reduced for quick testing, increase to 30+ for production
-  batch_size: 4  # Reduced for GPU memory, increase if your GPU allows
+  batch_size: 16  # Increased for RTX 3090 (24GB VRAM)
   amp: true
   seed: 42
   eval_steps: 200
   save_steps: 500
   
 data:
-  # Fixed to use actual existing data files
-  train_list: data/train_list.txt  # Changed from train_lists (plural) to train_list (singular)
-  val_list: data/val_list.txt
-  test_list: data/test_list.txt
+  # Use PaddleOCR format paths from converted data
+  train_list: data/paddle_format/recognition/train/label.txt
+  val_list: data/paddle_format/recognition/val/label.txt
+  test_list: data/paddle_format/recognition/test/label.txt
   format: paddleocr_rec
   
   # Data augmentation for recognition

@@ -37,18 +37,11 @@ print_status "Step 1: Downloading HuggingFace data..."
 if ! make download-hf 2>/dev/null; then
     print_warning "Make target failed, trying direct Python..."
     
-    # Try the fixed downloader first
-    if [ -f "ops/download_hf_fixed.py" ]; then
-        $PY ops/download_hf_fixed.py --output-dir data/hf_datasets --priority high || {
-            print_error "Download failed"
-            exit 1
-        }
-    else
-        $PY ops/download_hf.py --output-dir data/hf_datasets --priority high || {
-            print_error "Download failed"
-            exit 1
-        }
-    fi
+    $PY ops/download_hf.py --output-dir data/hf_datasets --priority high || {
+        print_error "Download failed - SynthKhmer-10k is required"
+        print_error "Check that ground_truth field is being extracted correctly"
+        exit 1
+    }
 fi
 
 # Step 2: Convert to PaddleOCR format
@@ -67,6 +60,23 @@ fi
 
 # Step 3: Validate dataset
 print_status "Step 3: Validating dataset..."
+
+# Check that label files exist and are non-empty
+for split in train val test; do
+    label_file="data/paddle_format/recognition/$split/label.txt"
+    if [ ! -f "$label_file" ]; then
+        print_error "Missing $label_file - conversion failed"
+        exit 1
+    fi
+    
+    line_count=$(wc -l < "$label_file" 2>/dev/null || echo "0")
+    if [ "$line_count" -eq "0" ]; then
+        print_error "$label_file is empty - no samples converted"
+        exit 1
+    fi
+    print_status "  $split: $line_count samples"
+done
+
 $PY ops/validate_dataset.py \
     --data-dir data/paddle_format \
     --charset train/charset_kh.txt \

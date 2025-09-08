@@ -84,6 +84,53 @@ def convert_synthkhmer_from_downloaded(input_dir, output_dir):
         return False
 
 
+def get_text_from_sample(sample):
+    """Extract text from a sample with robust field checking"""
+    # Method 1: Check ground_truth field (SynthKhmer-10k uses this)
+    if 'ground_truth' in sample:
+        gt = sample['ground_truth']
+        if isinstance(gt, str):
+            return gt.strip()
+        elif isinstance(gt, dict):
+            # Extract text from dict
+            for field in ['text', 'transcription', 'label', 'sentence']:
+                if field in gt and gt[field]:
+                    return str(gt[field]).strip()
+            # Try joining all string values
+            texts = [str(v).strip() for v in gt.values() if isinstance(v, str) and v.strip()]
+            if texts:
+                return ' '.join(texts)
+        elif isinstance(gt, list) and gt:
+            # If it's a list of annotations
+            texts = []
+            for item in gt:
+                if isinstance(item, str):
+                    texts.append(item)
+                elif isinstance(item, dict):
+                    for field in ['text', 'transcription', 'label']:
+                        if field in item:
+                            texts.append(str(item[field]))
+            if texts:
+                return ' '.join(texts)
+    
+    # Method 2: Direct text fields
+    text_fields = ['text', 'label', 'sentence', 'transcription', 'caption', 'khmer']
+    for field in text_fields:
+        if field in sample and sample[field]:
+            return str(sample[field]).strip()
+    
+    # Method 3: ID card fields (combine them)
+    id_fields = ['name', 'id', 'date_of_birth', 'gender', 'address']
+    id_parts = []
+    for field in id_fields:
+        if field in sample and sample[field]:
+            id_parts.append(str(sample[field]).strip())
+    if id_parts:
+        return ' '.join(id_parts)
+    
+    return None
+
+
 def convert_synthkhmer_direct(output_dir):
     """Convert SynthKhmer-10k directly from HF (fallback)"""
     print("\n🔄 Converting SynthKhmer-10k directly from HuggingFace...")
@@ -127,35 +174,29 @@ def convert_synthkhmer_direct(output_dir):
             
             labels = []
             valid_count = 0
+            no_text_count = 0
             
             # Print schema for debugging
             if len(data) > 0:
                 print(f"  Schema for {hf_split}: {list(data[0].keys())}")
+                # Print first sample to debug
+                if 'ground_truth' in data[0]:
+                    gt = data[0]['ground_truth']
+                    print(f"  ground_truth type: {type(gt).__name__}")
+                    if isinstance(gt, str):
+                        print(f"  ground_truth sample: '{gt[:100]}...'")
             
             for idx in indices:
                 row = data[idx]
                 
-                # Try multiple text fields - comprehensive list for SynthKhmer
-                text = None
-                text_fields = ['text', 'label', 'sentence', 'name', 'id', 
-                              'date_of_birth', 'gender', 'address', 'khmer']
+                # Use robust text extraction
+                text = get_text_from_sample(row)
                 
-                for field in text_fields:
-                    if field in row and row[field]:
-                        # Combine multiple fields if they're ID card fields
-                        if field in ['name', 'id', 'date_of_birth', 'gender', 'address']:
-                            # Combine all ID fields
-                            parts = []
-                            for f in ['name', 'id', 'date_of_birth', 'gender', 'address']:
-                                if f in row and row[f]:
-                                    parts.append(str(row[f]))
-                            if parts:
-                                text = ' '.join(parts)
-                                break
-                        else:
-                            text = str(row[field]).strip()
-                            if text:
-                                break
+                if not text:
+                    no_text_count += 1
+                    if no_text_count <= 3:  # Only log first few
+                        print(f"    No text for image {idx}")
+                    continue
                 
                 # Get image
                 image = row.get('image')
@@ -169,24 +210,32 @@ def convert_synthkhmer_direct(output_dir):
                             image.save(img_path)
                             labels.append(f"{img_filename}\t{text}")
                             valid_count += 1
+                            
+                            # Show first 3 extracted texts
+                            if valid_count <= 3:
+                                print(f"    Sample {valid_count}: '{text[:50]}...'")
                     except Exception as e:
                         print(f"    Error saving image: {e}")
+            
+            if no_text_count > 3:
+                print(f"    ... and {no_text_count - 3} more samples without text")
             
             # Save labels
             if labels:
                 label_file = rec_dir / our_split / "label.txt"
                 with open(label_file, 'w', encoding='utf-8') as f:
                     f.write('\n'.join(labels))
-                print(f"  ✅ {our_split}: {valid_count} samples")
+                print(f"  ✅ {our_split}: {valid_count} samples → {label_file}")
                 total_converted += valid_count
             else:
-                print(f"  ⚠️  {our_split}: No valid samples")
+                print(f"  ❌ {our_split}: No valid samples found")
         
         if total_converted > 0:
             print(f"✅ Converted SynthKhmer-10k: {total_converted} total samples")
             return True
         else:
-            print(f"❌ No samples converted from SynthKhmer-10k")
+            print(f"❌ CRITICAL: SynthKhmer-10k produced 0 valid samples")
+            print("   Check ground_truth field mapping in the dataset")
             return False
             
     except Exception as e:
@@ -197,6 +246,7 @@ def convert_synthkhmer_direct(output_dir):
 def convert_fonts_dataset(input_dir, output_dir):
     """Convert khmerfonts dataset"""
     print("\n🔄 Converting khmerfonts-info-previews...")
+    print("  ⚠️  Note: This dataset may not have text labels")
     
     # Try from downloaded files first
     fonts_dir = Path(input_dir) / "khmerfonts-info-previews"

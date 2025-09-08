@@ -18,6 +18,53 @@ except ImportError:
     sys.exit(1)
 
 
+def get_text_from_sample(sample):
+    """Extract text from a sample with robust field checking"""
+    # Method 1: Check ground_truth field (SynthKhmer-10k uses this)
+    if 'ground_truth' in sample:
+        gt = sample['ground_truth']
+        if isinstance(gt, str):
+            return gt.strip()
+        elif isinstance(gt, dict):
+            # Extract text from dict
+            for field in ['text', 'transcription', 'label', 'sentence']:
+                if field in gt and gt[field]:
+                    return str(gt[field]).strip()
+            # Try joining all string values
+            texts = [str(v).strip() for v in gt.values() if isinstance(v, str) and v.strip()]
+            if texts:
+                return ' '.join(texts)
+        elif isinstance(gt, list) and gt:
+            # If it's a list of annotations
+            texts = []
+            for item in gt:
+                if isinstance(item, str):
+                    texts.append(item)
+                elif isinstance(item, dict):
+                    for field in ['text', 'transcription', 'label']:
+                        if field in item:
+                            texts.append(str(item[field]))
+            if texts:
+                return ' '.join(texts)
+    
+    # Method 2: Direct text fields
+    text_fields = ['text', 'label', 'sentence', 'transcription', 'caption', 'khmer', 'kh_text']
+    for field in text_fields:
+        if field in sample and sample[field]:
+            return str(sample[field]).strip()
+    
+    # Method 3: ID card fields (combine them)
+    id_fields = ['name', 'id', 'date_of_birth', 'gender', 'address']
+    id_parts = []
+    for field in id_fields:
+        if field in sample and sample[field]:
+            id_parts.append(str(sample[field]).strip())
+    if id_parts:
+        return ' '.join(id_parts)
+    
+    return None
+
+
 def download_synthkhmer_10k(output_dir):
     """Download SynthKhmer-10k OCR dataset"""
     print("\n📥 Downloading SynthKhmer-10k...")
@@ -40,24 +87,26 @@ def download_synthkhmer_10k(output_dir):
             # Create label file
             labels = []
             valid_samples = 0
+            no_text_count = 0
             
             # Print schema for debugging
             if len(dataset[split_name]) > 0:
                 print(f"  Schema: {list(dataset[split_name][0].keys())}")
+                # Check ground_truth type
+                if 'ground_truth' in dataset[split_name][0]:
+                    gt = dataset[split_name][0]['ground_truth']
+                    print(f"  ground_truth type: {type(gt).__name__}")
             
             # Iterate over rows - NO URL construction!
             for idx, row in enumerate(dataset[split_name]):
-                # Try ALL possible field names for SynthKhmer
-                text = None
-                text_fields = ['text', 'label', 'sentence', 'kh_text', 'khmer', 
-                              'name', 'id', 'date_of_birth', 'gender', 'address',
-                              'transcription', 'caption']
+                # Use robust text extraction
+                text = get_text_from_sample(row)
                 
-                for field in text_fields:
-                    if field in row and row[field]:
-                        text = str(row[field]).strip()
-                        if text:  # Non-empty text
-                            break
+                if not text:
+                    no_text_count += 1
+                    if no_text_count <= 3:  # Only log first few
+                        print(f"    No text for image {idx}")
+                    continue
                 
                 # Get image
                 image = None
@@ -89,14 +138,18 @@ def download_synthkhmer_10k(output_dir):
                         labels.append(f"{img_filename}\t{text}")
                         valid_samples += 1
                         
+                        # Show first 3 extracted texts
+                        if valid_samples <= 3:
+                            print(f"    Sample {valid_samples}: '{text[:50]}...'")
+                        
                     except Exception as e:
                         print(f"    Error saving image {idx}: {e}")
                         continue
-                else:
-                    if not text:
-                        print(f"    Warning: No text for image {idx}")
-                    if image is None:
-                        print(f"    Warning: No image at index {idx}")
+                elif image is None:
+                    print(f"    Warning: No image at index {idx}")
+            
+            if no_text_count > 3:
+                print(f"    ... and {no_text_count - 3} more samples without text")
             
             # Save label file if we have valid samples
             if labels:
@@ -106,14 +159,15 @@ def download_synthkhmer_10k(output_dir):
                 print(f"  ✅ {split_name}: {valid_samples} valid samples")
                 total_samples += valid_samples
             else:
-                print(f"  ⚠️  {split_name}: No valid samples found!")
+                print(f"  ❌ {split_name}: No valid samples found!")
         
         # Check if we got any valid data
         if total_samples > 0:
             print(f"✅ Downloaded SynthKhmer-10k: {total_samples} total samples")
             return True
         else:
-            print(f"❌ Failed: SynthKhmer-10k has 0 valid samples")
+            print(f"❌ CRITICAL: SynthKhmer-10k produced 0 valid samples")
+            print("   Check ground_truth field mapping in the dataset")
             return False
             
     except Exception as e:
@@ -124,6 +178,7 @@ def download_synthkhmer_10k(output_dir):
 def download_khmerfonts_previews(output_dir):
     """Download khmerfonts-info-previews dataset"""
     print("\n📥 Downloading khmerfonts-info-previews...")
+    print("  ⚠️  Note: This dataset may not have text labels")
     
     output_path = Path(output_dir) / "khmerfonts-info-previews"
     output_path.mkdir(parents=True, exist_ok=True)
